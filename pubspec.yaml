@@ -33,8 +33,15 @@ flutter:
 
   assets:
     - assets/icons/
+    - assets/images/
     - assets/config/.env
   fonts:
+    - family: SeoulAlrim
+      fonts:
+        - asset: assets/fonts/SeoulAlrim-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/SeoulAlrim-ExtraBold.ttf
+          weight: 800
     - family: Pretendard
       fonts:
         - asset: assets/fonts/Pretendard-Thin.ttf

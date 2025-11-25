@@ -50,6 +50,7 @@ class ThemeColors {
   final Color greenDarkHover;
   final Color greenDarkActive;
   final Color greenDarker;
+  final Color yellow;
 
 
 
@@ -103,6 +104,7 @@ class ThemeColors {
     required this.greenDarkHover,
     required this.greenDarkActive,
     required this.greenDarker,
+    required this.yellow,
   });
 
   static ThemeColors of(BuildContext context) {
@@ -158,6 +160,7 @@ class ThemeColors {
       greenDarkHover: const Color(0xff1E7A35),
       greenDarkActive: const Color(0xff165C28),
       greenDarker: const Color(0xff12471F),
+      yellow: const Color(0xffF5C905)
     );
   }
 }

@@ -54,7 +54,7 @@ class _MainAppState extends State<MainApp> {
     
     return GetMaterialApp(
       getPages: AppRoutes.routes,
-      initialRoute: isLoggedIn ? AppRoutes.main : AppRoutes.login,
+      initialRoute: isLoggedIn ? AppRoutes.main : AppRoutes.welcome,
       debugShowCheckedModeBanner: false,
       theme: initThemeData(brightness: Brightness.light),
       darkTheme: initThemeData(brightness: Brightness.dark),

@@ -13,4 +13,7 @@ class FontFamily {
 
   /// Font family: Pretendard
   static const String pretendard = 'Pretendard';
+
+  /// Font family: SeoulAlrim
+  static const String seoulAlrim = 'SeoulAlrim';
 }

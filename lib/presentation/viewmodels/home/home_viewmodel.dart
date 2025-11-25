@@ -67,8 +67,7 @@ class HomeViewModel extends ChangeNotifier {
 
   void selectCertificate(Certificate certificate) {
     _isCertificateDropdownOpen = false;
-    _repository.setCurrentCertificate(certificate.id);
-    loadHomeData();
+    notifyListeners();
   }
 
   void setCurrentMode(int index) {

@@ -45,5 +45,7 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSUserNotificationsUsageDescription</key>
+	<string>학습 알림을 보내기 위해 알림 권한이 필요합니다.</string>
 </dict>
 </plist>

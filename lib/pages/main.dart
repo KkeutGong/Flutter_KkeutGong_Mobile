@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:kkeutgong_mobile/presentation/views/curriculum/curriculum_page.dart';
+import 'package:kkeutgong_mobile/presentation/views/home/home_page.dart';
 import 'package:kkeutgong_mobile/presentation/widgets/my_bottom_navigation_bar.dart';
 import 'package:kkeutgong_mobile/shared/styles/colors.dart';
 
@@ -18,12 +20,11 @@ class _MainPageState extends State<MainPage> {
   void initState() {
     super.initState();
     
-    pages = [
-      // TODO: Replace with actual page widgets
-      Container(),
-      Container(),
-      Container(),
-      Container(),
+    pages = const [
+      HomePage(),
+      CurriculumPage(),
+      SizedBox(),
+      SizedBox(),
     ];
   }
 
