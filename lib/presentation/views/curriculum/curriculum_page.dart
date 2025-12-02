@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:kkeutgong_mobile/data/repositories/home/home_repository.dart';
+import 'package:get/get.dart';
+import 'package:kkeutgong_mobile/core/routes/app_routes.dart';
 import 'package:kkeutgong_mobile/domain/models/home/certificate.dart';
 import 'package:kkeutgong_mobile/domain/models/home/home_data.dart';
 import 'package:kkeutgong_mobile/domain/models/home/study_mode.dart';
@@ -24,7 +25,7 @@ class _CurriculumPageState extends State<CurriculumPage> {
   @override
   void initState() {
     super.initState();
-    _viewModel = CurriculumViewModel(HomeRepository());
+    _viewModel = CurriculumViewModel(null);
     _viewModel.addListener(_onChanged);
     _viewModel.load();
   }
@@ -254,7 +255,7 @@ class _CurriculumPageState extends State<CurriculumPage> {
             size: ButtonSize.medium,
             theme: CustomButtonTheme.primary,
             disabled: !isExamReady,
-            onPressed: isExamReady ? () {} : null,
+            onPressed: isExamReady ? () => _navigateToMockExam(data.currentCertificate.name) : null,
           ),
         ],
       ),
@@ -418,10 +419,45 @@ class _CurriculumPageState extends State<CurriculumPage> {
             ),
           ),
           SizedBox(width: 32 * (MediaQuery.of(context).size.width / 375).clamp(0.85, 1.4)),
-          _buildUnitButton(colors, label, enabled, completed, locked),
+          _buildUnitButton(colors, label, enabled, completed, locked, subject, mode),
         ],
       ),
     );
+  }
+
+  Future<void> _navigateToStudyPage(Subject subject, StudyMode mode) async {
+    switch (mode) {
+      case StudyMode.concept:
+        await Get.toNamed(
+          AppRoutes.conceptStudy,
+          arguments: {'subjectName': subject.name},
+        );
+        break;
+      case StudyMode.practice:
+        await Get.toNamed(
+          AppRoutes.practiceStudy,
+          arguments: {'subjectName': subject.name},
+        );
+        break;
+      case StudyMode.review:
+        await Get.toNamed(
+          AppRoutes.practiceStudy,
+          arguments: {'subjectName': subject.name},
+        );
+        break;
+    }
+    await _viewModel.refresh();
+  }
+
+  Future<void> _navigateToMockExam(String certificateName) async {
+    await Get.toNamed(
+      AppRoutes.mockExam,
+      arguments: {
+        'examName': '$certificateName 모의고사',
+        'timeLimitMinutes': 150,
+      },
+    );
+    await _viewModel.refresh();
   }
 
   Widget _buildUnitProgressBar(ThemeColors colors, double progress) {
@@ -452,6 +488,8 @@ class _CurriculumPageState extends State<CurriculumPage> {
     bool enabled,
     bool completed,
     bool locked,
+    Subject subject,
+    StudyMode mode,
   ) {
     Color background;
     Color textColor;
@@ -474,7 +512,7 @@ class _CurriculumPageState extends State<CurriculumPage> {
       disabled: !enabled,
       backgroundColor: background,
       textColor: textColor,
-      onPressed: enabled ? () {} : null,
+      onPressed: enabled ? () => _navigateToStudyPage(subject, mode) : null,
     );
   }
 

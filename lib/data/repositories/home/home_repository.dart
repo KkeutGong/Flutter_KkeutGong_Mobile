@@ -1,11 +1,32 @@
 import 'package:kkeutgong_mobile/domain/models/home/home_data.dart';
+import 'package:kkeutgong_mobile/data/repositories/study/study_progress_repository.dart';
 
 class HomeRepository {
-  // 현재 선택된 자격증 ID (실제로는 서버나 로컬 저장소에서 가져올 값)
-  String _currentCertificateId = '1';
+  static final HomeRepository _instance = HomeRepository._internal();
+  factory HomeRepository() => _instance;
+  HomeRepository._internal();
 
-  Future<HomeData> getHomeData() async {
-    await Future.delayed(const Duration(milliseconds: 500));
+  String _currentCertificateId = '1';
+  
+  HomeData? _cache;
+  DateTime? _cacheTimestamp;
+  String? _cachedCertificateId;
+  static const Duration _cacheExpiry = Duration(minutes: 5);
+
+  bool get _isCacheValid {
+    if (_cache == null || _cacheTimestamp == null || _cachedCertificateId == null) {
+      return false;
+    }
+    if (_cachedCertificateId != _currentCertificateId) {
+      return false;
+    }
+    return DateTime.now().difference(_cacheTimestamp!) < _cacheExpiry;
+  }
+
+  Future<HomeData> getHomeData({bool forceRefresh = false}) async {
+    if (!forceRefresh && _isCacheValid) {
+      return _cache!;
+    }
 
     final today = DateTime.now();
     final daysFromSunday = today.weekday % 7;
@@ -20,15 +41,41 @@ class HomeRepository {
     });
     final currentStreak = recentDays.where((day) => day['isCompleted'] as bool).length;
 
-    // 자격증별 데이터 정의
     final certificateData = _getCertificateData(_currentCertificateId);
 
+    final progressRepo = StudyProgressRepository();
+    
+    // 현재 자격증의 첫 번째 subject에 대한 진행률 로드
+    final subjects = certificateData['subjects'] as List;
+    String? activeSubjectName;
+    for (final s in subjects) {
+      if (s['isCompleted'] != true) {
+        activeSubjectName = s['name'] as String?;
+        break;
+      }
+    }
+    
+    double conceptProgress = 0.0;
+    double practiceProgress = 0.0;
+    
+    if (activeSubjectName != null) {
+      conceptProgress = await progressRepo.getConceptPercent(activeSubjectName);
+      practiceProgress = await progressRepo.getPracticePercent(activeSubjectName);
+    }
+    
+    // 전체 진행률 계산 (모든 subject 기준)
+    final subjectNames = subjects.map((s) => s['name'] as String).toList();
+    final overallProgress = await progressRepo.calculateOverallProgress(subjectNames);
     final mockData = {
       'currentCertificate': certificateData['certificate'],
       'currentDay': certificateData['currentDay'],
-      'progress': certificateData['progress'],
+      'progress': overallProgress,
       'streakDays': currentStreak,
-      'studyModeProgress': certificateData['studyModeProgress'],
+      'studyModeProgress': {
+        'concept': conceptProgress,
+        'practice': practiceProgress,
+        'review': 0.0,
+      },
       'streakInfo': {
         'currentStreak': currentStreak,
         'maxStreak': 6,
@@ -56,12 +103,17 @@ class HomeRepository {
       ],
     };
 
-    return HomeData.fromJson(mockData);
+    final homeData = HomeData.fromJson(mockData);
+    _cache = homeData;
+    _cacheTimestamp = DateTime.now();
+    _cachedCertificateId = _currentCertificateId;
+
+    return homeData;
   }
 
   Map<String, dynamic> _getCertificateData(String certificateId) {
     switch (certificateId) {
-      case '1': // 정보처리기능사 - 초반 진행 중
+      case '1':
         return {
           'certificate': {
             'id': '1',
@@ -69,12 +121,12 @@ class HomeRepository {
             'icon': 'memory',
           },
           'currentDay': 8,
-          'progress': 0.206, // 20.6% 진행
+          'progress': 0,
           'completedLessons': 0,
           'studyModeProgress': {
-            'concept': 0.62,  // 개념학습 62% 완료
-            'practice': 0.0,  // 문제풀이 시작 전
-            'review': 0.0,    // 오답노트 시작 전
+            'concept': 0, 
+            'practice': 0,
+            'review': 0,
           },
           'subjects': [
             {
@@ -100,7 +152,7 @@ class HomeRepository {
           ],
         };
 
-      case '2': // 컴퓨터활용능력 2급 - 중반 진행 중
+      case '2':
         return {
           'certificate': {
             'id': '2',
@@ -108,12 +160,12 @@ class HomeRepository {
             'icon': 'desktop_mac',
           },
           'currentDay': 23,
-          'progress': 0.58, // 58% 진행
-          'completedLessons': 18,
+          'progress': 0,
+          'completedLessons': 0,
           'studyModeProgress': {
-            'concept': 1.0,   // 개념학습 완료
-            'practice': 0.45, // 문제풀이 45% 완료
-            'review': 0.12,   // 오답노트 12% 완료
+            'concept': 0,
+            'practice': 0,
+            'review': 0,
           },
           'subjects': [
             {
@@ -134,7 +186,7 @@ class HomeRepository {
           ],
         };
 
-      case '3': // 한국사능력검정시험 심화 - 거의 완료
+      case '3':
         return {
           'certificate': {
             'id': '3',
@@ -142,12 +194,12 @@ class HomeRepository {
             'icon': 'menu_book',
           },
           'currentDay': 42,
-          'progress': 0.89, // 89% 진행
-          'completedLessons': 35,
+          'progress': 0,
+          'completedLessons': 0,
           'studyModeProgress': {
-            'concept': 1.0,   // 개념학습 완료
-            'practice': 1.0,  // 문제풀이 완료
-            'review': 0.67,   // 오답노트 67% 완료
+            'concept': 0,
+            'practice': 0,
+            'review': 0,
           },
           'subjects': [
             {
@@ -185,5 +237,11 @@ class HomeRepository {
 
   void setCurrentCertificate(String certificateId) {
     _currentCertificateId = certificateId;
+  }
+
+  void invalidateCache() {
+    _cache = null;
+    _cacheTimestamp = null;
+    _cachedCertificateId = null;
   }
 }

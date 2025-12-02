@@ -3,34 +3,57 @@ import 'package:kkeutgong_mobile/data/repositories/home/home_repository.dart';
 import 'package:kkeutgong_mobile/domain/models/home/home_data.dart';
 import 'package:kkeutgong_mobile/domain/models/home/study_mode.dart';
 import 'package:kkeutgong_mobile/domain/models/home/subject.dart';
+import 'package:kkeutgong_mobile/data/repositories/study/study_progress_repository.dart';
 
 class CurriculumViewModel extends ChangeNotifier {
   final HomeRepository _repository;
+  final StudyProgressRepository _progressRepository = StudyProgressRepository();
 
-  CurriculumViewModel(this._repository);
+  CurriculumViewModel(HomeRepository? repository) : _repository = repository ?? HomeRepository();
 
   HomeData? _homeData;
   bool _isLoading = false;
+  bool _isInitialized = false;
   String? _error;
 
   HomeData? get homeData => _homeData;
   bool get isLoading => _isLoading;
+  bool get isInitialized => _isInitialized;
   String? get error => _error;
 
-  Future<void> load() async {
+  Future<void> load({bool forceRefresh = false}) async {
+    if (_isInitialized && !forceRefresh) {
+      return;
+    }
+
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      _homeData = await _repository.getHomeData();
+      _homeData = await _repository.getHomeData(forceRefresh: forceRefresh);
+      final subjectsList = _homeData?.subjects ?? [];
+      for (final s in subjectsList) {
+        final p = await _progressRepository.getPracticePercent(s.name);
+        final c = await _progressRepository.getConceptPercent(s.name);
+        _practicePercentBySubject[s.name] = p;
+        _conceptPercentBySubject[s.name] = c;
+      }
       _isLoading = false;
+      _isInitialized = true;
       notifyListeners();
     } catch (e) {
       _error = e.toString();
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  Future<void> refresh() async {
+    _practicePercentBySubject.clear();
+    _conceptPercentBySubject.clear();
+    _isInitialized = false;
+    await load(forceRefresh: true);
   }
 
   List<Subject> get subjects {
@@ -59,8 +82,22 @@ class CurriculumViewModel extends ChangeNotifier {
     if (subject.id != active.id) return 0;
     final data = _homeData;
     if (data == null) return 0;
-    return data.studyModeProgress.progressFor(mode);
+    switch (mode) {
+      case StudyMode.concept:
+        final persistedConcept = _conceptPercentBySubject[subject.name];
+        if (persistedConcept != null && persistedConcept > 0) return persistedConcept;
+        return data.studyModeProgress.progressFor(mode);
+      case StudyMode.practice:
+        final persisted = _practicePercentBySubject[subject.name];
+        if (persisted != null && persisted > 0) return persisted;
+        return data.studyModeProgress.progressFor(mode);
+      case StudyMode.review:
+        return data.studyModeProgress.progressFor(mode);
+    }
   }
+
+  final Map<String, double> _practicePercentBySubject = {};
+  final Map<String, double> _conceptPercentBySubject = {};
 
   bool isModeUnlocked(Subject subject, StudyMode mode) {
     if (subject.isCompleted) return true;
@@ -117,6 +154,7 @@ class CurriculumViewModel extends ChangeNotifier {
 
   void selectCertificate(String certificateId) {
     _repository.setCurrentCertificate(certificateId);
-    load();
+    _isInitialized = false;
+    load(forceRefresh: true);
   }
 }

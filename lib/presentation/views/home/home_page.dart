@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:kkeutgong_mobile/data/repositories/home/home_repository.dart';
+import 'package:get/get.dart';
+import 'package:kkeutgong_mobile/core/routes/app_routes.dart';
 import 'package:kkeutgong_mobile/domain/models/home/study_mode.dart';
 import 'package:kkeutgong_mobile/gen/assets.gen.dart';
 import 'package:kkeutgong_mobile/presentation/viewmodels/home_viewmodel.dart';
@@ -23,7 +24,7 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    _viewModel = HomeViewModel(HomeRepository());
+    _viewModel = HomeViewModel(null);
     _pageController = PageController();
     _viewModel.loadHomeData();
     _viewModel.addListener(_onViewModelChanged);
@@ -39,6 +40,34 @@ class _HomePageState extends State<HomePage> {
 
   void _onViewModelChanged() {
     setState(() {});
+  }
+
+  Future<void> _onStartStudy() async {
+    final currentMode = _viewModel.currentMode;
+    final hd = _viewModel.homeData;
+    final subjectName = (hd == null || hd.subjects.isEmpty)
+        ? ''
+        : (hd.subjects.firstWhere(
+              (s) => !s.isCompleted,
+              orElse: () => hd.subjects.first,
+            ).name);
+    
+    Future<dynamic>? nav;
+    switch (currentMode) {
+      case StudyMode.concept:
+        nav = Get.toNamed(AppRoutes.conceptStudy, arguments: {'subjectName': subjectName});
+        break;
+      case StudyMode.practice:
+        nav = Get.toNamed(AppRoutes.practiceStudy, arguments: {'subjectName': subjectName});
+        break;
+      case StudyMode.review:
+        nav = Get.toNamed(AppRoutes.mockExam, arguments: {'examName': subjectName, 'timeLimitMinutes': 150});
+        break;
+    }
+    if (nav != null) {
+      await nav;
+      await _viewModel.refresh();
+    }
   }
 
   @override
@@ -447,7 +476,7 @@ class _HomePageState extends State<HomePage> {
                 size: ButtonSize.large,
                 theme: CustomButtonTheme.primary,
                 disabled: !_viewModel.canStartCurrentMode,
-                onPressed: _viewModel.onStartPressed,
+                onPressed: () => _onStartStudy(),
               ),
             ),
           ],

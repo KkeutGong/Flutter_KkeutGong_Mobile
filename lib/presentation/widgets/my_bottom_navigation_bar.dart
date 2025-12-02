@@ -21,6 +21,12 @@ class _MyBottomNavigationBarState extends State<MyBottomNavigationBar> {
   @override
   Widget build(BuildContext context) {
     final colors = ThemeColors.of(context);
+    final screenWidth = MediaQuery.of(context).size.width;
+    
+    final horizontalPadding = screenWidth > 600 ? 48.0 : 24.0;
+    final itemSpacing = screenWidth > 600 ? 50.0 : 
+                        screenWidth > 400 ? 40.0 : 35.0;
+    final iconSize = screenWidth > 600 ? 28.0 : 24.0;
 
     return Container(
       decoration: BoxDecoration(
@@ -30,40 +36,52 @@ class _MyBottomNavigationBarState extends State<MyBottomNavigationBar> {
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 0),
+          padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 0),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _buildNavItem(
-                icon: Assets.icons.home,
-                selectedIcon: Assets.icons.homeFill,
-                label: '홈',
-                index: 0,
-                colors: colors,
+              Expanded(
+                child: _buildNavItem(
+                  icon: Assets.icons.home,
+                  selectedIcon: Assets.icons.homeFill,
+                  label: '홈',
+                  index: 0,
+                  colors: colors,
+                  iconSize: iconSize,
+                ),
               ),
-              const SizedBox(width: 35),
-              _buildNavItem(
-                icon: Assets.icons.route,
-                selectedIcon: Assets.icons.routeFill,
-                label: '커리큘럼',
-                index: 1,
-                colors: colors,
+              SizedBox(width: itemSpacing),
+              Expanded(
+                child: _buildNavItem(
+                  icon: Assets.icons.route,
+                  selectedIcon: Assets.icons.routeFill,
+                  label: '커리큘럼',
+                  index: 1,
+                  colors: colors,
+                  iconSize: iconSize,
+                ),
               ),
-              const SizedBox(width: 35),
-              _buildNavItem(
-                icon: Assets.icons.article,
-                selectedIcon: Assets.icons.articleFill,
-                label: '리포트',
-                index: 2,
-                colors: colors,
+              SizedBox(width: itemSpacing),
+              Expanded(
+                child: _buildNavItem(
+                  icon: Assets.icons.article,
+                  selectedIcon: Assets.icons.articleFill,
+                  label: '리포트',
+                  index: 2,
+                  colors: colors,
+                  iconSize: iconSize,
+                ),
               ),
-              const SizedBox(width: 35),
-              _buildNavItem(
-                icon: Assets.icons.person,
-                selectedIcon: Assets.icons.personFill,
-                label: '프로필',
-                index: 3,
-                colors: colors,
+              SizedBox(width: itemSpacing),
+              Expanded(
+                child: _buildNavItem(
+                  icon: Assets.icons.person,
+                  selectedIcon: Assets.icons.personFill,
+                  label: '프로필',
+                  index: 3,
+                  colors: colors,
+                  iconSize: iconSize,
+                ),
               ),
             ],
           ),
@@ -78,36 +96,42 @@ class _MyBottomNavigationBarState extends State<MyBottomNavigationBar> {
     required String label,
     required int index,
     required ThemeColors colors,
+    required double iconSize,
   }) {
     final isSelected = widget.currentIndex == index;
     final currentIcon = isSelected ? selectedIcon : icon;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final verticalPadding = screenWidth > 600 ? 16.0 : 12.0;
     
     return GestureDetector(
       onTap: () => widget.onTap(index),
       child: Container(
-        width: 60,
         color: Colors.transparent,
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12.0),
+          padding: EdgeInsets.symmetric(vertical: verticalPadding),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               currentIcon.svg(
-                width: 24.0,
-                height: 24.0,
+                width: iconSize,
+                height: iconSize,
                 colorFilter: ColorFilter.mode(
                   isSelected ? colors.gray900 : colors.gray70,
                   BlendMode.srcIn,
                 ),
               ),
               const SizedBox(height: 2),
-              Text(
-                label,
-                style: Typo.footnoteRegular(
-                  context,
-                  color: isSelected ? colors.gray900 : colors.gray70,
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  label,
+                  style: Typo.footnoteRegular(
+                    context,
+                    color: isSelected ? colors.gray900 : colors.gray70,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
                 ),
-                textAlign: TextAlign.center,
               ),
             ],
           ),
