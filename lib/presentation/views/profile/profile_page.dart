@@ -51,8 +51,6 @@ class _ProfilePageState extends State<ProfilePage> {
     final width = MediaQuery.of(context).size.width;
     final scale = (width / 375).clamp(0.85, 1.4);
 
-    final percentLabel = '${(_overall * 100).round()}%';
-
     return Scaffold(
       backgroundColor: colors.gray20,
       appBar: AppBar(

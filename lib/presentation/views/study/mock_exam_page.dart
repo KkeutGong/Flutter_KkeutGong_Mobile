@@ -1,10 +1,44 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:kkeutgong_mobile/domain/models/study/question.dart';
 import 'package:kkeutgong_mobile/domain/models/study/exam_result.dart';
 import 'package:kkeutgong_mobile/gen/assets.gen.dart';
 import 'package:kkeutgong_mobile/presentation/viewmodels/study/mock_exam_viewmodel.dart';
+import 'package:kkeutgong_mobile/presentation/widgets/common/custom_button.dart';
 import 'package:kkeutgong_mobile/shared/styles/colors.dart';
 import 'package:kkeutgong_mobile/shared/styles/typography.dart';
+
+class _ResponsiveHelper {
+  final BuildContext context;
+  late final double screenWidth;
+  late final double screenHeight;
+  late final bool isSmallScreen;
+  late final bool isMediumScreen;
+  late final double scaleFactor;
+
+  _ResponsiveHelper(this.context) {
+    screenWidth = MediaQuery.of(context).size.width;
+    screenHeight = MediaQuery.of(context).size.height;
+    isSmallScreen = screenWidth < 360;
+    isMediumScreen = screenWidth >= 360 && screenWidth < 400;
+    scaleFactor = (screenWidth / 375).clamp(0.85, 1.2);
+  }
+
+  double get horizontalPadding => isSmallScreen ? 20 : (isMediumScreen ? 25 : 30);
+  double get iconSize => (24 * scaleFactor).clamp(20.0, 28.0);
+  double get smallIconSize => (16 * scaleFactor).clamp(14.0, 20.0);
+  double get mediumIconSize => (20 * scaleFactor).clamp(18.0, 24.0);
+  double get largeIconSize => (28 * scaleFactor).clamp(24.0, 32.0);
+  double get numberBadgeSize => (24 * scaleFactor).clamp(20.0, 28.0);
+  double get smallNumberBadgeSize => (22 * scaleFactor).clamp(18.0, 26.0);
+  double get questionCircleSize => (50 * scaleFactor).clamp(42.0, 58.0);
+  double get choicePaddingH => isSmallScreen ? 14 : (isMediumScreen ? 17 : 20);
+  double get choicePaddingV => isSmallScreen ? 12 : (isMediumScreen ? 14 : 16);
+  double get buttonPaddingH => isSmallScreen ? 24 : (isMediumScreen ? 29 : 34);
+  double get modalPadding => isSmallScreen ? 18 : (isMediumScreen ? 21 : 24);
+  double get explanationPaddingH => isSmallScreen ? 24 : (isMediumScreen ? 30 : 35);
+  double get explanationPaddingV => isSmallScreen ? 28 : (isMediumScreen ? 34 : 40);
+}
 
 class MockExamPage extends StatefulWidget {
   final String examName;
@@ -53,21 +87,22 @@ class _MockExamPageState extends State<MockExamPage> {
   }
 
   void _showSubmitConfirmation() {
-    showModalBottomSheet(
+    showDialog(
       context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => _SubmitConfirmationModal(
+      barrierColor: Colors.black.withOpacity(0.5),
+      builder: (context) => _SubmitConfirmationDialog(
         unansweredCount: _viewModel.unansweredCount,
-        onSubmit: _viewModel.submitExam,
+        onSubmit: () {
+          _viewModel.submitExam();
+        },
       ),
     );
   }
 
   void _showAllQuestions() {
-    showModalBottomSheet(
+    showDialog(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withOpacity(0.5),
       builder: (context) => _AllQuestionsModal(
         questions: _viewModel.questions,
         currentIndex: _viewModel.currentIndex,
@@ -80,6 +115,7 @@ class _MockExamPageState extends State<MockExamPage> {
   @override
   Widget build(BuildContext context) {
     final colors = ThemeColors.of(context);
+    final responsive = _ResponsiveHelper(context);
 
     if (_viewModel.isLoading && !_viewModel.isInitialized) {
       return Scaffold(
@@ -89,11 +125,14 @@ class _MockExamPageState extends State<MockExamPage> {
     }
 
     if (_viewModel.state == ExamState.ready) {
-      return _StartModal(
+      return _StartScreen(
         examName: widget.examName,
         timeLimitMinutes: widget.timeLimitMinutes,
+        questions: _viewModel.questions,
+        currentIndex: _viewModel.currentIndex,
         onStart: _viewModel.startExam,
         onClose: () => Navigator.of(context).pop(),
+        responsive: responsive,
       );
     }
 
@@ -106,6 +145,7 @@ class _MockExamPageState extends State<MockExamPage> {
         onPrevious: _viewModel.goToPrevious,
         onNext: _viewModel.goToNext,
         onComplete: () => Navigator.of(context).pop(),
+        responsive: responsive,
       );
     }
 
@@ -114,121 +154,341 @@ class _MockExamPageState extends State<MockExamPage> {
       currentIndex: _viewModel.currentIndex,
       remainingSeconds: _viewModel.remainingSeconds,
       onSelectAnswer: _viewModel.selectAnswer,
+      onNext: _viewModel.goToNext,
+      onPrevious: _viewModel.goToPrevious,
       onSubmit: _showSubmitConfirmation,
-      onViewAllQuestions: _showAllQuestions,
       onClose: () => Navigator.of(context).pop(),
+      allAnswered: _viewModel.allAnswered,
+      responsive: responsive,
     );
   }
 }
 
-class _StartModal extends StatelessWidget {
+class _StartScreen extends StatelessWidget {
   final String examName;
   final int timeLimitMinutes;
+  final List<Question> questions;
+  final int currentIndex;
   final VoidCallback onStart;
   final VoidCallback onClose;
+  final _ResponsiveHelper responsive;
 
-  const _StartModal({
+  const _StartScreen({
     required this.examName,
     required this.timeLimitMinutes,
+    required this.questions,
+    required this.currentIndex,
     required this.onStart,
     required this.onClose,
+    required this.responsive,
   });
 
   @override
   Widget build(BuildContext context) {
     final colors = ThemeColors.of(context);
+    final question = questions.isNotEmpty ? questions[currentIndex] : null;
 
     return Scaffold(
       backgroundColor: colors.gray20,
+      appBar: _buildAppBar(context, colors),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            children: [
-              Row(
-                children: [
-                  GestureDetector(
-                    onTap: onClose,
-                    child: Container(
-                      width: 44,
-                      height: 44,
-                      alignment: Alignment.center,
-                      child: Assets.icons.close.svg(
-                        width: 24,
-                        height: 24,
-                        colorFilter: ColorFilter.mode(colors.gray900, BlendMode.srcIn),
+        child: Stack(
+          children: [
+            Column(
+              children: [
+                _buildTimerBar(context, colors),
+                if (question != null)
+                  Expanded(
+                    child: ImageFiltered(
+                      imageFilter: ImageFilter.blur(sigmaX: 9, sigmaY: 9),
+                      child: SingleChildScrollView(
+                        padding: EdgeInsets.fromLTRB(responsive.horizontalPadding - 3, 24 * responsive.scaleFactor, responsive.horizontalPadding - 3, 100 * responsive.scaleFactor),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildQuestionTitle(context, colors, question),
+                            SizedBox(height: 60 * responsive.scaleFactor),
+                            _buildChoices(context, colors, question),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ],
-              ),
-              Expanded(
-                child: Center(
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: colors.gray0,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: colors.gray70),
+                _buildBottomButton(context, colors, false),
+              ],
+            ),
+            Center(
+              child: Container(
+                margin: EdgeInsets.symmetric(horizontal: 50 * responsive.scaleFactor),
+                padding: EdgeInsets.all(responsive.modalPadding),
+                decoration: BoxDecoration(
+                  color: colors.gray0,
+                  borderRadius: BorderRadius.circular(12 * responsive.scaleFactor),
+                  border: Border.all(color: colors.gray70),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.25),
+                      offset: const Offset(0, 4),
+                      blurRadius: 4,
                     ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '안내사항',
+                      style: Typo.headingStrong(context, color: colors.gray900),
+                    ),
+                    SizedBox(height: 24 * responsive.scaleFactor),
+                    Column(
                       children: [
                         Text(
-                          '안내사항',
-                          style: Typo.headingStrong(context, color: colors.gray900),
+                          '- 모의고사모드는 실제 시험장과 비슷한 환경을 제공해 드려요.',
+                          style: Typo.bodyRegular(
+                            context,
+                            color: colors.gray300,
+                          ),
                         ),
-                        const SizedBox(height: 24),
-                        _buildInfoRow(context, colors, '시험명', examName),
-                        const SizedBox(height: 12),
-                        _buildInfoRow(context, colors, '제한시간', '$timeLimitMinutes분'),
-                        const SizedBox(height: 12),
-                        _buildInfoRow(context, colors, '문제수', '100문제'),
-                        const SizedBox(height: 32),
-                        SizedBox(
-                          width: double.infinity,
-                          child: GestureDetector(
-                            onTap: onStart,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              decoration: BoxDecoration(
-                                color: colors.primaryNormal,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              alignment: Alignment.center,
-                              child: Text(
-                                '시험 응시하기',
-                                style: Typo.bodyRegular(context, color: colors.gray0),
-                              ),
-                            ),
+                        Text(
+                          '- 제한 시간이 있으며 시험을 제출하면 시험 결과와 다시 보기를 진행 할 수 있어요',
+                          style: Typo.bodyRegular(
+                            context,
+                            color: colors.gray300,
                           ),
                         ),
                       ],
                     ),
-                  ),
+                    SizedBox(height: 10 * responsive.scaleFactor),
+                    Align(
+                      alignment: Alignment.center,
+                      child: Text(
+                        '제한 시간: ${timeLimitMinutes}분',
+                        style: Typo.bodyStrong(context, color: colors.gray900),
+                      ),
+                    ),
+                    SizedBox(height: 24 * responsive.scaleFactor),
+                    Center(
+                      child: CustomButton(
+                        text: '시험 응시하기',
+                        size: ButtonSize.medium,
+                        theme: CustomButtonTheme.grayscale,
+                        onPressed: onStart,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildInfoRow(BuildContext context, ThemeColors colors, String label, String value) {
+  PreferredSize _buildAppBar(BuildContext context, ThemeColors colors) {
+    return PreferredSize(
+      preferredSize: const Size.fromHeight(kToolbarHeight),
+      child: Container(
+        decoration: BoxDecoration(
+          color: colors.gray0,
+          border: Border(bottom: BorderSide(color: colors.gray70)),
+        ),
+        child: AppBar(
+          backgroundColor: colors.gray0,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          leading: GestureDetector(
+            onTap: onClose,
+            child: Padding(
+              padding: EdgeInsets.all(15 * responsive.scaleFactor),
+              child: Assets.icons.arrowBackIos.svg(
+                width: responsive.iconSize,
+                height: responsive.iconSize,
+                colorFilter: ColorFilter.mode(colors.gray900, BlendMode.srcIn),
+              ),
+            ),
+          ),
+          title: Row(
+            children: [
+              Expanded(
+                child: Container(
+                  height: 12 * responsive.scaleFactor,
+                  decoration: BoxDecoration(
+                    color: colors.primaryLight,
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                  child: FractionallySizedBox(
+                    alignment: Alignment.centerLeft,
+                    widthFactor: questions.isNotEmpty
+                        ? (currentIndex / questions.length)
+                        : 0,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: colors.primaryNormal,
+                        borderRadius: BorderRadius.circular(99),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(width: 15 * responsive.scaleFactor),
+              Text(
+                '$currentIndex/${questions.length}',
+                style: Typo.bodyRegular(context, color: colors.gray900),
+              ),
+              SizedBox(width: 15 * responsive.scaleFactor),
+            ],
+          ),
+          titleSpacing: 0,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTimerBar(BuildContext context, ThemeColors colors) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 15 * responsive.scaleFactor, vertical: 15 * responsive.scaleFactor),
+      decoration: BoxDecoration(
+        color: colors.gray0,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            offset: const Offset(0, 4),
+            blurRadius: 4,
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            '남은시간: $timeLimitMinutes분',
+            style: Typo.bodyRegular(context, color: colors.redNormal),
+          ),
+          CustomButton(
+            text: '제출',
+            size: ButtonSize.small,
+            theme: CustomButtonTheme.grayscale,
+            disabled: true,
+            onPressed: null,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuestionTitle(
+    BuildContext context,
+    ThemeColors colors,
+    Question q,
+  ) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          label,
-          style: Typo.bodyRegular(context, color: colors.gray300),
+          '${q.number}.',
+          style: Typo.titleStrong(context, color: colors.gray900),
         ),
-        Text(
-          value,
-          style: Typo.bodyStrong(context, color: colors.gray900),
+        SizedBox(width: 10 * responsive.scaleFactor),
+        Expanded(
+          child: Text(
+            q.text,
+            style: Typo.headingStrong(context, color: colors.gray900),
+          ),
         ),
       ],
+    );
+  }
+
+  Widget _buildChoices(BuildContext context, ThemeColors colors, Question q) {
+    return Column(
+      children: q.choices.map((choice) {
+        return Padding(
+          padding: EdgeInsets.only(bottom: 10 * responsive.scaleFactor),
+          child: GestureDetector(
+            onTap: null,
+            child: Container(
+              width: double.infinity,
+              padding: EdgeInsets.symmetric(horizontal: responsive.choicePaddingH, vertical: responsive.choicePaddingV),
+              decoration: BoxDecoration(
+                color: colors.gray0,
+                borderRadius: BorderRadius.circular(12 * responsive.scaleFactor),
+                border: Border.all(color: colors.gray900),
+              ),
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: responsive.numberBadgeSize,
+                        height: responsive.numberBadgeSize,
+                        decoration: BoxDecoration(
+                          color: colors.gray30,
+                          borderRadius: BorderRadius.circular(99),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          '${choice.number}',
+                          style: Typo.bodyRegular(
+                            context,
+                            color: colors.gray900,
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 8 * responsive.scaleFactor),
+                      Expanded(
+                        child: Text(
+                          choice.text,
+                          style: Typo.bodyRegular(
+                            context,
+                            color: colors.gray900,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildBottomButton(
+    BuildContext context,
+    ThemeColors colors,
+    bool hasAnswer,
+  ) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(horizontal: responsive.buttonPaddingH),
+      child: Row(
+        children: [
+          Expanded(
+            child: CustomButton(
+              text: '이전으로',
+              size: ButtonSize.large,
+              theme: CustomButtonTheme.grayscale,
+              disabled: true,
+            ),
+          ),
+          SizedBox(width: 12 * responsive.scaleFactor),
+          Expanded(
+            child: CustomButton(
+              text: '다음으로',
+              size: ButtonSize.large,
+              theme: CustomButtonTheme.grayscale,
+              disabled: !hasAnswer,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -238,269 +498,286 @@ class _ExamPage extends StatelessWidget {
   final int currentIndex;
   final int remainingSeconds;
   final Function(int) onSelectAnswer;
+  final VoidCallback onNext;
+  final VoidCallback onPrevious;
   final VoidCallback onSubmit;
-  final VoidCallback onViewAllQuestions;
   final VoidCallback onClose;
+  final bool allAnswered;
+  final _ResponsiveHelper responsive;
 
   const _ExamPage({
     required this.questions,
     required this.currentIndex,
     required this.remainingSeconds,
     required this.onSelectAnswer,
+    required this.onNext,
+    required this.onPrevious,
     required this.onSubmit,
-    required this.onViewAllQuestions,
     required this.onClose,
+    required this.allAnswered,
+    required this.responsive,
   });
 
   String get _formattedTime {
     final minutes = remainingSeconds ~/ 60;
-    return '$minutes분';
+    final seconds = remainingSeconds % 60;
+    return '$minutes분 ${seconds.toString().padLeft(2, '0')}초';
   }
 
-  bool get _allAnswered => questions.every((q) => q.selectedAnswer != null);
+  int get _answeredCount =>
+      questions.where((q) => q.selectedAnswer != null).length;
 
   @override
   Widget build(BuildContext context) {
     final colors = ThemeColors.of(context);
     final question = questions[currentIndex];
+    final hasAnswer = question.selectedAnswer != null;
 
     return Scaffold(
       backgroundColor: colors.gray20,
+      appBar: _buildAppBar(context, colors),
       body: SafeArea(
         child: Column(
           children: [
-            _buildHeader(context, colors),
+            _buildTimerBar(context, colors),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+                padding: EdgeInsets.fromLTRB(responsive.horizontalPadding, 24 * responsive.scaleFactor, responsive.horizontalPadding, 20 * responsive.scaleFactor),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildQuestionCard(context, colors, question),
-                    const SizedBox(height: 16),
+                    _buildQuestionTitle(context, colors, question),
+                    SizedBox(height: 60 * responsive.scaleFactor),
                     _buildChoices(context, colors, question),
                   ],
                 ),
               ),
             ),
-            _buildBottomNavigation(context, colors),
+            _buildBottomButton(context, colors, hasAnswer),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildHeader(BuildContext context, ThemeColors colors) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-      child: Row(
-        children: [
-          GestureDetector(
+  PreferredSize _buildAppBar(BuildContext context, ThemeColors colors) {
+    return PreferredSize(
+      preferredSize: const Size.fromHeight(kToolbarHeight),
+      child: Container(
+        decoration: BoxDecoration(
+          color: colors.gray0,
+          border: Border(bottom: BorderSide(color: colors.gray70)),
+        ),
+        child: AppBar(
+          backgroundColor: colors.gray0,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          leading: GestureDetector(
             onTap: onClose,
-            child: Container(
-              width: 44,
-              height: 44,
-              alignment: Alignment.center,
-              child: Assets.icons.close.svg(
-                width: 24,
-                height: 24,
+            child: Padding(
+              padding: EdgeInsets.all(15 * responsive.scaleFactor),
+              child: Assets.icons.arrowBackIos.svg(
+                width: responsive.iconSize,
+                height: responsive.iconSize,
                 colorFilter: ColorFilter.mode(colors.gray900, BlendMode.srcIn),
               ),
             ),
           ),
-          Expanded(
-            child: Center(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: colors.redLight,
-                  borderRadius: BorderRadius.circular(99),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Assets.icons.schedule.svg(
-                      width: 16,
-                      height: 16,
-                      colorFilter: ColorFilter.mode(colors.redNormal, BlendMode.srcIn),
+          title: Row(
+            children: [
+              Expanded(
+                child: Container(
+                  height: 12 * responsive.scaleFactor,
+                  decoration: BoxDecoration(
+                    color: colors.primaryLight,
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                  child: FractionallySizedBox(
+                    alignment: Alignment.centerLeft,
+                    widthFactor: questions.isNotEmpty
+                        ? (_answeredCount / questions.length)
+                        : 0,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: colors.primaryNormal,
+                        borderRadius: BorderRadius.circular(99),
+                      ),
                     ),
-                    const SizedBox(width: 4),
-                    Text(
-                      '남은시간: $_formattedTime',
-                      style: Typo.footnoteStrong(context, color: colors.redNormal),
-                    ),
-                  ],
+                  ),
                 ),
               ),
-            ),
+              SizedBox(width: 15 * responsive.scaleFactor),
+              Text(
+                '$_answeredCount/${questions.length}',
+                style: Typo.bodyRegular(context, color: colors.gray900),
+              ),
+              SizedBox(width: 15 * responsive.scaleFactor),
+            ],
           ),
-          if (_allAnswered)
-            GestureDetector(
-              onTap: onSubmit,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: colors.primaryNormal,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  '제출하기',
-                  style: Typo.footnoteStrong(context, color: colors.gray0),
-                ),
-              ),
-            )
-          else
-            GestureDetector(
-              onTap: onSubmit,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: colors.gray70,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  '제출',
-                  style: Typo.footnoteStrong(context, color: colors.gray0),
-                ),
-              ),
-            ),
-        ],
+          titleSpacing: 0,
+        ),
       ),
     );
   }
 
-  Widget _buildQuestionCard(BuildContext context, ThemeColors colors, Question question) {
+  Widget _buildTimerBar(BuildContext context, ThemeColors colors) {
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.symmetric(horizontal: 15 * responsive.scaleFactor, vertical: 15 * responsive.scaleFactor),
       decoration: BoxDecoration(
         color: colors.gray0,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: colors.gray70),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            offset: const Offset(0, 4),
+            blurRadius: 4,
+          ),
+        ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
+        mainAxisAlignment: allAnswered
+            ? MainAxisAlignment.start
+            : MainAxisAlignment.spaceBetween,
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: colors.gray20,
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Text(
-              '${question.number}번',
-              style: Typo.footnoteStrong(context, color: colors.gray600),
-            ),
-          ),
-          const SizedBox(height: 12),
           Text(
-            question.text,
-            style: Typo.bodyRegular(context, color: colors.gray900),
+            '남은시간: $_formattedTime',
+            style: Typo.bodyRegular(context, color: colors.redNormal),
           ),
+          if (!allAnswered) ...[
+            CustomButton(
+              text: '제출',
+              size: ButtonSize.small,
+              theme: CustomButtonTheme.grayscale,
+              onPressed: onSubmit,
+            ),
+          ],
         ],
       ),
     );
   }
 
-  Widget _buildChoices(BuildContext context, ThemeColors colors, Question question) {
-    return Column(
-      children: question.choices.map((choice) {
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: _buildChoiceItem(context, colors, question, choice),
-        );
-      }).toList(),
+  Widget _buildQuestionTitle(
+    BuildContext context,
+    ThemeColors colors,
+    Question q,
+  ) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '${q.number}.',
+          style: Typo.titleStrong(context, color: colors.gray900),
+        ),
+        SizedBox(width: 10 * responsive.scaleFactor),
+        Expanded(
+          child: Text(
+            q.text,
+            style: Typo.headingStrong(context, color: colors.gray900),
+          ),
+        ),
+      ],
     );
   }
 
-  Widget _buildChoiceItem(
+  Widget _buildChoices(
     BuildContext context,
     ThemeColors colors,
     Question question,
-    Choice choice,
   ) {
-    final isSelected = question.selectedAnswer == choice.number;
-
-    return GestureDetector(
-      onTap: () => onSelectAnswer(choice.number),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isSelected ? colors.primaryLight : colors.gray0,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected ? colors.primaryNormal : colors.gray70,
-          ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 28,
-              height: 28,
+    return Column(
+      children: question.choices.map((choice) {
+        final isSelected = question.selectedAnswer == choice.number;
+        return Padding(
+          padding: EdgeInsets.only(bottom: 10 * responsive.scaleFactor),
+          child: GestureDetector(
+            onTap: () => onSelectAnswer(choice.number),
+            child: Container(
+              width: double.infinity,
+              padding: EdgeInsets.symmetric(horizontal: responsive.choicePaddingH, vertical: responsive.choicePaddingV),
               decoration: BoxDecoration(
-                color: isSelected ? colors.primaryNormal : colors.gray20,
-                borderRadius: BorderRadius.circular(6),
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                '${choice.number}',
-                style: Typo.footnoteStrong(
-                  context,
-                  color: isSelected ? colors.gray0 : colors.gray600,
+                color: isSelected ? colors.primaryLightHover : colors.gray0,
+                borderRadius: BorderRadius.circular(12 * responsive.scaleFactor),
+                border: Border.all(
+                  color: isSelected ? colors.primaryNormal : colors.gray900,
                 ),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                choice.text,
-                style: Typo.bodyRegular(context, color: colors.gray900),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBottomNavigation(BuildContext context, ThemeColors colors) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-      child: Row(
-        children: [
-          Expanded(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: colors.gray0,
-                borderRadius: BorderRadius.circular(99),
-                border: Border.all(color: colors.gray70),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+              child: Stack(
+                clipBehavior: Clip.none,
                 children: [
-                  Text(
-                    '${currentIndex + 1}/${questions.length}',
-                    style: Typo.footnoteStrong(context, color: colors.gray900),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: responsive.numberBadgeSize,
+                        height: responsive.numberBadgeSize,
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? colors.primaryLightActive
+                              : colors.gray30,
+                          borderRadius: BorderRadius.circular(99),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          '${choice.number}',
+                          style: Typo.bodyRegular(
+                            context,
+                            color: colors.gray900,
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 8 * responsive.scaleFactor),
+                      Expanded(
+                        child: Text(
+                          choice.text,
+                          style: isSelected
+                              ? Typo.bodyStrong(context, color: colors.gray900)
+                              : Typo.bodyRegular(
+                                  context,
+                                  color: colors.gray900,
+                                ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
           ),
-          const SizedBox(width: 12),
-          GestureDetector(
-            onTap: onViewAllQuestions,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(
-                color: colors.gray900,
-                borderRadius: BorderRadius.circular(99),
-              ),
-              child: Text(
-                '전체보기',
-                style: Typo.footnoteStrong(context, color: colors.gray0),
-              ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildBottomButton(
+    BuildContext context,
+    ThemeColors colors,
+    bool hasAnswer,
+  ) {
+    final isFirstQuestion = currentIndex == 0;
+    final isLastQuestion = currentIndex == questions.length - 1;
+    final buttonText = (allAnswered && isLastQuestion) ? '제출하기' : '다음으로';
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(horizontal: responsive.buttonPaddingH),
+      child: Row(
+        children: [
+          Expanded(
+            child: CustomButton(
+              text: '이전으로',
+              size: ButtonSize.large,
+              theme: CustomButtonTheme.grayscale,
+              disabled: isFirstQuestion,
+              onPressed: onPrevious,
+            ),
+          ),
+          SizedBox(width: 12 * responsive.scaleFactor),
+          Expanded(
+            child: CustomButton(
+              text: buttonText,
+              size: ButtonSize.large,
+              theme: CustomButtonTheme.grayscale,
+              disabled: !hasAnswer,
+              onPressed: (allAnswered && isLastQuestion) ? onSubmit : onNext,
             ),
           ),
         ],
@@ -509,11 +786,11 @@ class _ExamPage extends StatelessWidget {
   }
 }
 
-class _SubmitConfirmationModal extends StatelessWidget {
+class _SubmitConfirmationDialog extends StatelessWidget {
   final int unansweredCount;
   final VoidCallback onSubmit;
 
-  const _SubmitConfirmationModal({
+  const _SubmitConfirmationDialog({
     required this.unansweredCount,
     required this.onSubmit,
   });
@@ -521,78 +798,89 @@ class _SubmitConfirmationModal extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = ThemeColors.of(context);
+    final responsive = _ResponsiveHelper(context);
 
-    return Container(
-      margin: const EdgeInsets.all(20),
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: colors.gray0,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            '시험을 제출하시겠습니까?',
-            style: Typo.headingStrong(context, color: colors.gray900),
-          ),
-          const SizedBox(height: 16),
-          if (unansweredCount > 0)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: colors.redLight,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                '풀지않은문제: $unansweredCount문제',
-                style: Typo.labelRegular(context, color: colors.redNormal),
-              ),
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      child: Container(
+        padding: EdgeInsets.all(responsive.modalPadding),
+        decoration: BoxDecoration(
+          color: colors.gray0,
+          borderRadius: BorderRadius.circular(12 * responsive.scaleFactor),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '제출하시겠어요?',
+              style: Typo.headingStrong(context, color: colors.gray900),
             ),
-          const SizedBox(height: 24),
-          Row(
-            children: [
-              Expanded(
-                child: GestureDetector(
-                  onTap: () => Navigator.of(context).pop(),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    decoration: BoxDecoration(
-                      color: colors.gray50,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      '취소',
-                      style: Typo.bodyRegular(context, color: colors.gray900),
+            SizedBox(height: 10 * responsive.scaleFactor),
+            Text(
+              '풀이 화면으로 다시 돌아올 수 없어요',
+              style: Typo.labelRegular(context, color: colors.gray300),
+            ),
+            SizedBox(height: 24 * responsive.scaleFactor),
+            Row(
+              children: [
+                Text(
+                  '풀지 않은 문제',
+                  style: Typo.labelRegular(context, color: colors.gray900),
+                ),
+                const Spacer(),
+                Text(
+                  '$unansweredCount문제',
+                  style: Typo.labelRegular(context, color: colors.redNormal),
+                ),
+              ],
+            ),
+            SizedBox(height: 24 * responsive.scaleFactor),
+            Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => Navigator.of(context).pop(),
+                    child: Container(
+                      padding: EdgeInsets.symmetric(vertical: 16 * responsive.scaleFactor),
+                      decoration: BoxDecoration(
+                        color: colors.redLightHover,
+                        border: Border.all(color: colors.redNormalHover),
+                        borderRadius: BorderRadius.circular(12 * responsive.scaleFactor),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        '취소',
+                        style: Typo.bodyRegular(context, color: colors.gray900),
+                      ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: GestureDetector(
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    onSubmit();
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    decoration: BoxDecoration(
-                      color: colors.primaryNormal,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      '제출하기',
-                      style: Typo.bodyRegular(context, color: colors.gray0),
+                SizedBox(width: 12 * responsive.scaleFactor),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      onSubmit();
+                    },
+                    child: Container(
+                      padding: EdgeInsets.symmetric(vertical: 16 * responsive.scaleFactor),
+                      decoration: BoxDecoration(
+                        color: colors.gray900,
+                        borderRadius: BorderRadius.circular(12 * responsive.scaleFactor),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        '제출하기',
+                        style: Typo.bodyRegular(context, color: colors.gray0),
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ],
-          ),
-        ],
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -614,102 +902,132 @@ class _AllQuestionsModal extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = ThemeColors.of(context);
+    final responsive = _ResponsiveHelper(context);
 
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.7,
-      decoration: BoxDecoration(
-        color: colors.gray0,
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(20),
-          topRight: Radius.circular(20),
+    return Center(
+      child: Material(
+        color: Colors.transparent,
+        child: Container(
+          margin: EdgeInsets.symmetric(horizontal: 25 * responsive.scaleFactor),
+          padding: EdgeInsets.all(responsive.modalPadding),
+          decoration: BoxDecoration(
+            color: colors.gray0,
+            borderRadius: BorderRadius.circular(12 * responsive.scaleFactor),
+            border: Border.all(color: colors.gray300),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.25),
+                offset: const Offset(0, 4),
+                blurRadius: 4,
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '문제 전체보기',
+                          style: Typo.headingStrong(context, color: colors.gray900),
+                        ),
+                        SizedBox(height: 10 * responsive.scaleFactor),
+                        Text(
+                          '번호를 누르면 해당 번호로 이동해요',
+                          style: Typo.footnoteRegular(context, color: colors.gray600),
+                        ),
+                      ],
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () => Navigator.of(context).pop(),
+                    child: Assets.icons.close.svg(
+                      width: responsive.largeIconSize,
+                      height: responsive.largeIconSize,
+                      colorFilter: ColorFilter.mode(
+                        colors.gray900,
+                        BlendMode.srcIn,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 44 * responsive.scaleFactor),
+              _buildQuestionGrid(context, colors, responsive),
+            ],
+          ),
         ),
       ),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(20),
-            child: Row(
-              children: [
-                Text(
-                  '전체보기',
-                  style: Typo.headingStrong(context, color: colors.gray900),
-                ),
-                const Spacer(),
-                GestureDetector(
-                  onTap: () => Navigator.of(context).pop(),
-                  child: Assets.icons.close.svg(
-                    width: 24,
-                    height: 24,
-                    colorFilter: ColorFilter.mode(colors.gray900, BlendMode.srcIn),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: GridView.builder(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 5,
-                mainAxisSpacing: 8,
-                crossAxisSpacing: 8,
-                childAspectRatio: 1,
+    );
+  }
+
+  Widget _buildQuestionGrid(BuildContext context, ThemeColors colors, _ResponsiveHelper responsive) {
+    final rows = <Widget>[];
+    for (int i = 0; i < questions.length; i += 5) {
+      final rowItems = <Widget>[];
+      for (int j = i; j < i + 5 && j < questions.length; j++) {
+        final question = questions[j];
+        
+        Color backgroundColor = colors.gray0;
+        Color borderColor = colors.gray900;
+        
+        if (isReviewMode && question.isCorrect != null) {
+          if (question.isCorrect!) {
+            backgroundColor = colors.greenLightHover;
+            borderColor = colors.greenNormalHover;
+          } else {
+            backgroundColor = colors.redLightHover;
+            borderColor = colors.redNormalHover;
+          }
+        }
+
+        rowItems.add(
+          GestureDetector(
+            onTap: () => onSelect(j),
+            child: Container(
+              width: responsive.questionCircleSize,
+              height: responsive.questionCircleSize,
+              decoration: BoxDecoration(
+                color: backgroundColor,
+                borderRadius: BorderRadius.circular(99),
+                border: Border.all(color: borderColor),
               ),
-              itemCount: questions.length,
-              itemBuilder: (context, index) {
-                final question = questions[index];
-                final isCurrent = index == currentIndex;
-                final hasAnswer = question.selectedAnswer != null;
-
-                Color backgroundColor = colors.gray20;
-                Color textColor = colors.gray600;
-                Color borderColor = colors.gray70;
-
-                if (isReviewMode && question.isCorrect != null) {
-                  if (question.isCorrect!) {
-                    backgroundColor = colors.greenLightHover;
-                    borderColor = colors.greenNormal;
-                    textColor = colors.greenNormal;
-                  } else {
-                    backgroundColor = colors.redLightHover;
-                    borderColor = colors.redNormal;
-                    textColor = colors.redNormal;
-                  }
-                } else if (hasAnswer) {
-                  backgroundColor = colors.primaryLight;
-                  borderColor = colors.primaryNormal;
-                  textColor = colors.primaryNormal;
-                }
-
-                if (isCurrent) {
-                  borderColor = colors.gray900;
-                }
-
-                return GestureDetector(
-                  onTap: () => onSelect(index),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: backgroundColor,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: borderColor, width: isCurrent ? 2 : 1),
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      '${index + 1}',
-                      style: Typo.labelStrong(context, color: textColor),
-                    ),
-                  ),
-                );
-              },
+              alignment: Alignment.center,
+              child: Text(
+                '${j + 1}',
+                style: Typo.bodyRegular(context, color: colors.gray900),
+              ),
             ),
           ),
-        ],
-      ),
+        );
+      }
+      
+      rows.add(
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: rowItems,
+        ),
+      );
+    }
+
+    return Column(
+      children: rows
+          .map((row) => Padding(
+                padding: EdgeInsets.only(bottom: 26 * responsive.scaleFactor),
+                child: row,
+              ))
+          .toList(),
     );
   }
 }
 
-class _ResultPage extends StatelessWidget {
+class _ResultPage extends StatefulWidget {
   final ExamResult result;
   final List<Question> questions;
   final int currentIndex;
@@ -717,6 +1035,7 @@ class _ResultPage extends StatelessWidget {
   final VoidCallback onPrevious;
   final VoidCallback onNext;
   final VoidCallback onComplete;
+  final _ResponsiveHelper responsive;
 
   const _ResultPage({
     required this.result,
@@ -726,380 +1045,547 @@ class _ResultPage extends StatelessWidget {
     required this.onPrevious,
     required this.onNext,
     required this.onComplete,
+    required this.responsive,
   });
 
+  @override
+  State<_ResultPage> createState() => _ResultPageState();
+}
+
+class _ResultPageState extends State<_ResultPage> {
+  bool _showExplanation = false;
+
   String get _formattedTime {
-    final minutes = result.elapsedTime.inMinutes;
-    final seconds = result.elapsedTime.inSeconds % 60;
-    return '$minutes분 $seconds초';
+    final minutes = widget.result.elapsedTime.inMinutes;
+    return '$minutes 분';
+  }
+
+  @override
+  void didUpdateWidget(covariant _ResultPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.currentIndex != widget.currentIndex) {
+      _showExplanation = false;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final colors = ThemeColors.of(context);
+    final responsive = widget.responsive;
 
     return Scaffold(
       backgroundColor: colors.gray20,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildHeader(context, colors),
-              const SizedBox(height: 24),
-              _buildSummaryCard(context, colors),
-              const SizedBox(height: 16),
-              _buildSubjectScores(context, colors),
-              const SizedBox(height: 16),
-              _buildQuestionReview(context, colors),
-              const SizedBox(height: 24),
-              _buildCompleteButton(context, colors),
-            ],
-          ),
+        child: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.symmetric(
+                  horizontal: responsive.horizontalPadding + 3,
+                  vertical: 24 * responsive.scaleFactor,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildSummarySection(context, colors, responsive),
+                    SizedBox(height: 24 * responsive.scaleFactor),
+                    _buildSubjectScoresSection(context, colors, responsive),
+                    SizedBox(height: 24 * responsive.scaleFactor),
+                    _buildQuestionReviewSection(context, colors, responsive),
+                  ],
+                ),
+              ),
+            ),
+            _buildBottomButton(context, colors, responsive),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildHeader(BuildContext context, ThemeColors colors) {
-    return Row(
-      children: [
-        Text(
-          '시험 결과',
-          style: Typo.titleStrong(context, color: colors.gray900),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSummaryCard(BuildContext context, ThemeColors colors) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: colors.gray0,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: colors.gray70),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '학습개요',
-            style: Typo.headingStrong(context, color: colors.gray900),
-          ),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              Expanded(
-                child: _buildSummaryItem(
-                  context, colors, '총문제수', '${result.totalQuestions}문제',
-                ),
-              ),
-              Expanded(
-                child: _buildSummaryItem(
-                  context, colors, '맞은문제수', '${result.correctCount}문제',
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: _buildSummaryItem(
-                  context, colors, '걸린시간', _formattedTime,
-                ),
-              ),
-              Expanded(
-                child: _buildSummaryItem(
-                  context,
-                  colors,
-                  '합격여부',
-                  result.isPassed ? '합격' : '불합격',
-                  valueColor: result.isPassed ? colors.greenNormal : colors.redNormal,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSummaryItem(
-    BuildContext context,
-    ThemeColors colors,
-    String label,
-    String value, {
-    Color? valueColor,
-  }) {
+  Widget _buildSummarySection(BuildContext context, ThemeColors colors, _ResponsiveHelper responsive) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          label,
-          style: Typo.footnoteRegular(context, color: colors.gray300),
+          '학습 개요',
+          style: Typo.headingStrong(context, color: colors.gray900),
         ),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: Typo.headingStrong(context, color: valueColor ?? colors.gray900),
+        SizedBox(height: 12 * responsive.scaleFactor),
+        Container(
+          width: double.infinity,
+          padding: EdgeInsets.symmetric(horizontal: 16 * responsive.scaleFactor, vertical: 32 * responsive.scaleFactor),
+          decoration: BoxDecoration(
+            color: colors.gray0,
+            borderRadius: BorderRadius.circular(12 * responsive.scaleFactor),
+            border: Border.all(color: colors.gray300),
+          ),
+          child: Column(
+            children: [
+              _buildSummaryRow(context, colors, '총 문제 수', '${widget.result.totalQuestions} 문제'),
+              SizedBox(height: 10 * responsive.scaleFactor),
+              _buildSummaryRow(context, colors, '맞은 문제 수', '${widget.result.correctCount} 문제'),
+              SizedBox(height: 10 * responsive.scaleFactor),
+              _buildSummaryRow(context, colors, '걸린 시간', _formattedTime),
+              SizedBox(height: 16 * responsive.scaleFactor),
+              Container(
+                width: double.infinity,
+                padding: EdgeInsets.only(top: 16 * responsive.scaleFactor),
+                decoration: BoxDecoration(
+                  border: Border(top: BorderSide(color: colors.gray300)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '합격 여부',
+                      style: Typo.headingStrong(context, color: colors.gray900),
+                    ),
+                    Text(
+                      widget.result.isPassed ? '합격' : '불합격',
+                      style: Typo.headingRegular(
+                        context,
+                        color: widget.result.isPassed ? colors.greenNormal : colors.redNormal,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildSubjectScores(BuildContext context, ThemeColors colors) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: colors.gray0,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: colors.gray70),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '과목별 점수',
-            style: Typo.headingStrong(context, color: colors.gray900),
+  Widget _buildSummaryRow(
+    BuildContext context,
+    ThemeColors colors,
+    String label,
+    String value,
+  ) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: Typo.bodyStrong(context, color: colors.gray900)),
+        Text(value, style: Typo.bodyRegular(context, color: colors.redNormal)),
+      ],
+    );
+  }
+
+  Widget _buildSubjectScoresSection(BuildContext context, ThemeColors colors, _ResponsiveHelper responsive) {
+    final scores = widget.result.subjectScores.values.toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '과목별 맞은 문제 수',
+          style: Typo.headingStrong(context, color: colors.gray900),
+        ),
+        SizedBox(height: 12 * responsive.scaleFactor),
+        Container(
+          width: double.infinity,
+          padding: EdgeInsets.all(32 * responsive.scaleFactor),
+          decoration: BoxDecoration(
+            color: colors.gray0,
+            borderRadius: BorderRadius.circular(12 * responsive.scaleFactor),
+            border: Border.all(color: colors.gray300),
           ),
-          const SizedBox(height: 16),
-          ...result.subjectScores.entries.map((entry) {
-            final score = entry.value;
-            final percentage = (score.accuracy * 100).round();
-            
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Row(
-                children: [
-                  Expanded(
-                    flex: 2,
-                    child: Text(
-                      score.name,
-                      style: Typo.labelRegular(context, color: colors.gray900),
+          child: Column(
+            children: [
+              for (int i = 0; i < scores.length; i++) ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      scores[i].name,
+                      style: Typo.bodyRegular(context, color: colors.gray900),
                     ),
-                  ),
-                  Expanded(
-                    flex: 3,
-                    child: Container(
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: colors.gray50,
-                        borderRadius: BorderRadius.circular(4),
+                    SizedBox(
+                      width: 47 * responsive.scaleFactor,
+                      child: Text(
+                        '${scores[i].correctCount} / ${scores[i].totalQuestions}',
+                        style: Typo.bodyRegular(context, color: colors.gray600),
+                        textAlign: TextAlign.right,
                       ),
-                      child: FractionallySizedBox(
-                        alignment: Alignment.centerLeft,
-                        widthFactor: score.accuracy,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: percentage >= 60 ? colors.greenNormal : colors.redNormal,
-                            borderRadius: BorderRadius.circular(4),
+                    ),
+                  ],
+                ),
+                if (i < scores.length - 1) ...[
+                  SizedBox(height: 16 * responsive.scaleFactor),
+                  Container(
+                    width: double.infinity,
+                    height: 1,
+                    color: colors.gray300,
+                  ),
+                  SizedBox(height: 16 * responsive.scaleFactor),
+                ],
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildQuestionReviewSection(BuildContext context, ThemeColors colors, _ResponsiveHelper responsive) {
+    if (widget.questions.isEmpty ||
+        widget.currentIndex >= widget.questions.length) {
+      return const SizedBox.shrink();
+    }
+    final question = widget.questions[widget.currentIndex];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  '문제 다시 보기',
+                  style: Typo.headingStrong(context, color: colors.gray900),
+                ),
+                Row(
+                  children: [
+                    GestureDetector(
+                      onTap: widget.currentIndex > 0 ? widget.onPrevious : null,
+                      child: Opacity(
+                        opacity: widget.currentIndex > 0 ? 1.0 : 0.3,
+                        child: Assets.icons.arrowBackIos.svg(
+                          width: responsive.mediumIconSize,
+                          height: responsive.mediumIconSize,
+                          colorFilter: ColorFilter.mode(
+                            colors.gray900,
+                            BlendMode.srcIn,
                           ),
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  SizedBox(
-                    width: 50,
-                    child: Text(
-                      '$percentage점',
-                      style: Typo.labelStrong(
-                        context,
-                        color: percentage >= 60 ? colors.greenNormal : colors.redNormal,
-                      ),
-                      textAlign: TextAlign.right,
+                    SizedBox(width: 8 * responsive.scaleFactor),
+                    Text(
+                      '${widget.currentIndex + 1}',
+                      style: Typo.titleStrong(context, color: colors.gray900),
                     ),
+                    SizedBox(width: 8 * responsive.scaleFactor),
+                    GestureDetector(
+                      onTap: widget.currentIndex < widget.questions.length - 1
+                          ? widget.onNext
+                          : null,
+                      child: Opacity(
+                        opacity:
+                            widget.currentIndex < widget.questions.length - 1
+                            ? 1.0
+                            : 0.3,
+                        child: Assets.icons.arrowForwardIos.svg(
+                          width: responsive.mediumIconSize,
+                          height: responsive.mediumIconSize,
+                          colorFilter: ColorFilter.mode(
+                            colors.gray900,
+                            BlendMode.srcIn,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ),
+        SizedBox(height: 10 * responsive.scaleFactor),
+        Align(
+          alignment: Alignment.centerRight,
+          child: CustomButton(
+            text: '전체보기',
+            size: ButtonSize.small,
+            theme: CustomButtonTheme.grayscale,
+            onPressed: widget.onViewAllQuestions,
+          ),
+        ),
+        SizedBox(height: 12 * responsive.scaleFactor),
+        Container(
+          width: double.infinity,
+          padding: EdgeInsets.all(32 * responsive.scaleFactor),
+          decoration: BoxDecoration(
+            color: colors.gray0,
+            borderRadius: BorderRadius.circular(12 * responsive.scaleFactor),
+            border: Border.all(color: colors.gray300),
+          ),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${question.number}.',
+                        style: Typo.headingStrong(
+                          context,
+                          color: colors.gray900,
+                        ),
+                      ),
+                      SizedBox(width: 10 * responsive.scaleFactor),
+                      Expanded(
+                        child: Text(
+                          question.text,
+                          style: Typo.bodyStrong(
+                            context,
+                            color: colors.gray900,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 32 * responsive.scaleFactor),
+                  ...question.choices.map((choice) {
+                    final isChoiceCorrect = choice.isCorrect;
+                    final wasSelected =
+                        question.selectedAnswer == choice.number;
+
+                    Color bgColor = colors.gray0;
+                    Color borderColor = colors.gray900;
+                    Color numBgColor = colors.gray30;
+                    bool isBold = false;
+
+                    if (wasSelected && !isChoiceCorrect) {
+                      bgColor = colors.redLightHover;
+                      borderColor = colors.redNormalHover;
+                      numBgColor = colors.redLightActive;
+                      isBold = true;
+                    } else if (wasSelected && isChoiceCorrect) {
+                      bgColor = colors.greenLightHover;
+                      borderColor = colors.greenNormalHover;
+                      numBgColor = colors.greenLightActive;
+                      isBold = true;
+                    } else if (!wasSelected && isChoiceCorrect) {
+                      bgColor = colors.gray0;
+                      borderColor = colors.greenNormalHover;
+                      numBgColor = colors.greenLightActive;
+                      isBold = true;
+                    }
+
+                    return Padding(
+                      padding: EdgeInsets.only(bottom: 10 * responsive.scaleFactor),
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          Container(
+                            width: double.infinity,
+                            padding: EdgeInsets.symmetric(
+                              horizontal: responsive.choicePaddingH,
+                              vertical: responsive.choicePaddingV,
+                            ),
+                            decoration: BoxDecoration(
+                              color: bgColor,
+                              borderRadius: BorderRadius.circular(12 * responsive.scaleFactor),
+                              border: Border.all(color: borderColor),
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  width: responsive.smallNumberBadgeSize,
+                                  height: responsive.smallNumberBadgeSize,
+                                  decoration: BoxDecoration(
+                                    color: numBgColor,
+                                    borderRadius: BorderRadius.circular(99),
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: Text(
+                                    '${choice.number}',
+                                    style: Typo.footnoteRegular(
+                                      context,
+                                      color: colors.gray900,
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(width: 8 * responsive.scaleFactor),
+                                Expanded(
+                                  child: Text(
+                                    choice.text,
+                                    style: isBold
+                                        ? Typo.footnoteStrong(
+                                            context,
+                                            color: colors.gray900,
+                                          )
+                                        : Typo.footnoteRegular(
+                                            context,
+                                            color: colors.gray900,
+                                          ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (question.selectedAnswer != choice.number &&
+                              isChoiceCorrect)
+                            Positioned(
+                              top: -10 * responsive.scaleFactor,
+                              right: -10 * responsive.scaleFactor,
+                              child: Container(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 4 * responsive.scaleFactor,
+                                  vertical: 1 * responsive.scaleFactor,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: colors.greenLightHover,
+                                  borderRadius: BorderRadius.circular(6 * responsive.scaleFactor),
+                                  border: Border.all(
+                                    color: colors.greenNormalHover,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Assets.icons.check.svg(
+                                      width: responsive.smallIconSize,
+                                      height: responsive.smallIconSize,
+                                      colorFilter: ColorFilter.mode(
+                                        colors.gray900,
+                                        BlendMode.srcIn,
+                                      ),
+                                    ),
+                                    SizedBox(width: 4 * responsive.scaleFactor),
+                                    Text(
+                                      '정답',
+                                      style: Typo.footnoteRegular(
+                                        context,
+                                        color: colors.gray900,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    );
+                  }),
+                  SizedBox(height: 16 * responsive.scaleFactor),
+                  Text(
+                    '해설',
+                    style: Typo.footnoteStrong(context, color: colors.gray900),
+                  ),
+                  SizedBox(height: 4 * responsive.scaleFactor),
+                  Stack(
+                    children: [
+                      Container(
+                        width: double.infinity,
+                        padding: EdgeInsets.symmetric(
+                          horizontal: responsive.explanationPaddingH,
+                          vertical: responsive.explanationPaddingV,
+                        ),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12 * responsive.scaleFactor),
+                          border: Border.all(color: colors.gray300),
+                        ),
+                        child: ImageFiltered(
+                          imageFilter: _showExplanation
+                              ? ImageFilter.blur(sigmaX: 0, sigmaY: 0)
+                              : ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+                          child: Text(
+                            question.explanation,
+                            style: Typo.footnoteRegular(
+                              context,
+                              color: colors.gray900,
+                            ),
+                          ),
+                        ),
+                      ),
+                      if (!_showExplanation)
+                        Positioned.fill(
+                          child: Center(
+                            child: CustomButton(
+                              text: '해설보기',
+                              size: ButtonSize.small,
+                              theme: CustomButtonTheme.primary,
+                              leftIcon: Assets.icons.visibility,
+                              onPressed: () {
+                                setState(() {
+                                  _showExplanation = true;
+                                });
+                              },
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ],
               ),
-            );
-          }),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildQuestionReview(BuildContext context, ThemeColors colors) {
-    final question = questions[currentIndex];
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: colors.gray0,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: colors.gray70),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text(
-                '문제다시보기',
-                style: Typo.headingStrong(context, color: colors.gray900),
-              ),
-              const Spacer(),
-              GestureDetector(
-                onTap: onViewAllQuestions,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: colors.gray900,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    '전체보기',
-                    style: Typo.footnoteStrong(context, color: colors.gray0),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              GestureDetector(
-                onTap: currentIndex > 0 ? onPrevious : null,
-                child: Opacity(
-                  opacity: currentIndex > 0 ? 1.0 : 0.3,
+              if (question.isCorrect != null && question.isCorrect!)
+                Positioned(
+                  top: -32 * responsive.scaleFactor,
+                  left: -17 * responsive.scaleFactor,
                   child: Container(
-                    width: 40,
-                    height: 40,
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 2 * responsive.scaleFactor,
+                      vertical: 2 * responsive.scaleFactor,
+                    ).copyWith(top: 12 * responsive.scaleFactor),
                     decoration: BoxDecoration(
-                      color: colors.gray20,
-                      borderRadius: BorderRadius.circular(8),
+                      color: colors.greenNormal,
+                      borderRadius: BorderRadius.only(
+                        bottomLeft: Radius.circular(3 * responsive.scaleFactor),
+                        bottomRight: Radius.circular(3 * responsive.scaleFactor),
+                      ),
                     ),
-                    child: Assets.icons.arrowBackIos.svg(
-                      width: 20,
-                      height: 20,
-                      colorFilter: ColorFilter.mode(colors.gray900, BlendMode.srcIn),
+                    child: Assets.icons.check.svg(
+                      width: 12 * responsive.scaleFactor,
+                      height: 12 * responsive.scaleFactor,
+                      colorFilter: ColorFilter.mode(
+                        colors.gray0,
+                        BlendMode.srcIn,
+                      ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 16),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: question.isCorrect == true ? colors.greenLight : colors.redLight,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  '${currentIndex + 1}번 ${question.isCorrect == true ? "정답" : "오답"}',
-                  style: Typo.labelStrong(
-                    context,
-                    color: question.isCorrect == true ? colors.greenNormal : colors.redNormal,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              GestureDetector(
-                onTap: currentIndex < questions.length - 1 ? onNext : null,
-                child: Opacity(
-                  opacity: currentIndex < questions.length - 1 ? 1.0 : 0.3,
+              if (question.isCorrect != null && !question.isCorrect!)
+                Positioned(
+                  top: -32 * responsive.scaleFactor,
+                  left: -17 * responsive.scaleFactor,
                   child: Container(
-                    width: 40,
-                    height: 40,
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 2 * responsive.scaleFactor,
+                      vertical: 2 * responsive.scaleFactor,
+                    ).copyWith(top: 12 * responsive.scaleFactor),
                     decoration: BoxDecoration(
-                      color: colors.gray20,
-                      borderRadius: BorderRadius.circular(8),
+                      color: colors.redNormal,
+                      borderRadius: BorderRadius.only(
+                        bottomLeft: Radius.circular(3 * responsive.scaleFactor),
+                        bottomRight: Radius.circular(3 * responsive.scaleFactor),
+                      ),
                     ),
-                    child: Assets.icons.arrowForwardIos.svg(
-                      width: 20,
-                      height: 20,
-                      colorFilter: ColorFilter.mode(colors.gray900, BlendMode.srcIn),
+                    child: Assets.icons.close.svg(
+                      width: 12 * responsive.scaleFactor,
+                      height: 12 * responsive.scaleFactor,
+                      colorFilter: ColorFilter.mode(
+                        colors.gray0,
+                        BlendMode.srcIn,
+                      ),
                     ),
                   ),
                 ),
-              ),
             ],
-          ),
-          const SizedBox(height: 16),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: colors.gray20,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  question.text,
-                  style: Typo.bodyRegular(context, color: colors.gray900),
-                ),
-                const SizedBox(height: 12),
-                ...question.choices.map((choice) {
-                  final isCorrect = choice.isCorrect;
-                  final wasSelected = question.selectedAnswer == choice.number;
-                  
-                  Color textColor = colors.gray600;
-                  if (isCorrect) {
-                    textColor = colors.greenNormal;
-                  } else if (wasSelected) {
-                    textColor = colors.redNormal;
-                  }
-
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Row(
-                      children: [
-                        Text(
-                          '${choice.number}. ${choice.text}',
-                          style: Typo.labelRegular(context, color: textColor),
-                        ),
-                        if (isCorrect)
-                          Padding(
-                            padding: const EdgeInsets.only(left: 8),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: colors.greenNormal,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                '정답',
-                                style: Typo.captionStrong(context, color: colors.gray0),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  );
-                }),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCompleteButton(BuildContext context, ThemeColors colors) {
-    return SizedBox(
-      width: double.infinity,
-      child: GestureDetector(
-        onTap: onComplete,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          decoration: BoxDecoration(
-            color: colors.primaryNormal,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            '완료하기',
-            style: Typo.bodyRegular(context, color: colors.gray0),
           ),
         ),
+      ],
+    );
+  }
+
+  Widget _buildBottomButton(BuildContext context, ThemeColors colors, _ResponsiveHelper responsive) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(horizontal: responsive.horizontalPadding + 3, vertical: 16 * responsive.scaleFactor),
+      child: CustomButton(
+        text: '완료하기',
+        size: ButtonSize.large,
+        theme: CustomButtonTheme.grayscale,
+        onPressed: widget.onComplete,
       ),
     );
   }

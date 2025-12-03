@@ -99,7 +99,6 @@ class MockExamViewModel extends ChangeNotifier {
     if (_questions.isEmpty) return;
 
     _questions[_currentIndex].selectedAnswer = answerNumber;
-    _repository.saveAnswer(_questions[_currentIndex].id, answerNumber);
     notifyListeners();
   }
 
@@ -126,6 +125,7 @@ class MockExamViewModel extends ChangeNotifier {
 
   void submitExam() {
     _timer?.cancel();
+    _currentIndex = 0;
 
     for (final question in _questions) {
       if (question.selectedAnswer != null) {
@@ -136,38 +136,44 @@ class MockExamViewModel extends ChangeNotifier {
     }
 
     final correctCount = _questions.where((q) => q.isCorrect == true).length;
-    final subjects = ['전자기학', '전력공학', '전기기기', '회로이론', '전기설비기준'];
-    final subjectScores = <String, SubjectScore>{};
-
-    for (int i = 0; i < subjects.length; i++) {
-      final startIdx = i * 20;
-      final endIdx = (i + 1) * 20;
-      final subjectQuestions = _questions.sublist(startIdx, endIdx);
-      final subjectCorrect = subjectQuestions.where((q) => q.isCorrect == true).length;
-
-      subjectScores[subjects[i]] = SubjectScore(
-        name: subjects[i],
-        totalQuestions: 20,
-        correctCount: subjectCorrect,
-      );
-    }
+    final subjectScores = <String, SubjectScore>{
+      '전기이론': SubjectScore(
+        name: '전기이론',
+        totalQuestions: _questions.length,
+        correctCount: correctCount,
+      ),
+    };
 
     _result = ExamResult(
       totalQuestions: _questions.length,
       correctCount: correctCount,
       elapsedTime: Duration(seconds: _elapsedSeconds),
-      isPassed: correctCount >= 60,
+      isPassed: correctCount >= (_questions.length * 0.6).round(),
       subjectScores: subjectScores,
     );
 
-    _repository.saveExamResult(_result!);
     _state = ExamState.submitted;
     notifyListeners();
+  }
+
+  void reset() {
+    _timer?.cancel();
+    _questions = [];
+    _state = ExamState.ready;
+    _currentIndex = 0;
+    _remainingSeconds = 0;
+    _elapsedSeconds = 0;
+    _result = null;
+    _isLoading = false;
+    _isInitialized = false;
+    _error = null;
+    _repository.invalidateCache(examName);
   }
 
   @override
   void dispose() {
     _timer?.cancel();
+    reset();
     super.dispose();
   }
 }

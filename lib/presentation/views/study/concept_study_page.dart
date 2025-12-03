@@ -6,6 +6,31 @@ import 'package:kkeutgong_mobile/presentation/viewmodels/study/concept_study_vie
 import 'package:kkeutgong_mobile/shared/styles/colors.dart';
 import 'package:kkeutgong_mobile/shared/styles/typography.dart';
 
+class _ResponsiveHelper {
+  final BuildContext context;
+  late final double screenWidth;
+  late final double screenHeight;
+  late final bool isSmallScreen;
+  late final bool isMediumScreen;
+  late final double scaleFactor;
+
+  _ResponsiveHelper(this.context) {
+    screenWidth = MediaQuery.of(context).size.width;
+    screenHeight = MediaQuery.of(context).size.height;
+    isSmallScreen = screenWidth < 360;
+    isMediumScreen = screenWidth >= 360 && screenWidth < 400;
+    scaleFactor = (screenWidth / 375).clamp(0.85, 1.2);
+  }
+
+  double get horizontalPadding => isSmallScreen ? 14 : (isMediumScreen ? 17 : 20);
+  double get iconSize => (24 * scaleFactor).clamp(20.0, 28.0);
+  double get largeIconSize => (36 * scaleFactor).clamp(30.0, 42.0);
+  double get checkIconSize => (48 * scaleFactor).clamp(40.0, 56.0);
+  double get badgeWidth => (93 * scaleFactor).clamp(78.0, 108.0);
+  double get badgeHeight => (72 * scaleFactor).clamp(60.0, 84.0);
+  double get completedIconContainerSize => (80 * scaleFactor).clamp(68.0, 96.0);
+}
+
 class ConceptStudyPage extends StatefulWidget {
   final String subjectName;
 
@@ -57,6 +82,7 @@ class _ConceptStudyPageState extends State<ConceptStudyPage> {
   @override
   Widget build(BuildContext context) {
     final colors = ThemeColors.of(context);
+    final responsive = _ResponsiveHelper(context);
 
     if (_viewModel.isLoading) {
       return Scaffold(
@@ -73,12 +99,12 @@ class _ConceptStudyPageState extends State<ConceptStudyPage> {
     }
 
     if (_viewModel.isCompleted) {
-      return _buildCompletedScreen(context, colors);
+      return _buildCompletedScreen(context, colors, responsive);
     }
 
     return Scaffold(
       backgroundColor: colors.gray20,
-      appBar: _buildAppBar(context, colors),
+      appBar: _buildAppBar(context, colors, responsive),
       body: WillPopScope(
         onWillPop: () async {
           await _viewModel.saveProgress();
@@ -121,7 +147,7 @@ class _ConceptStudyPageState extends State<ConceptStudyPage> {
               itemBuilder: (context, index) {
                 final card = _viewModel.cards[index];
                 return Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+                  padding: EdgeInsets.fromLTRB(responsive.horizontalPadding, 12 * responsive.scaleFactor, responsive.horizontalPadding, responsive.horizontalPadding),
                   child: _FlashCard(
                     card: card,
                     onKnown: _onMarkAsKnown,
@@ -131,6 +157,7 @@ class _ConceptStudyPageState extends State<ConceptStudyPage> {
                     onToggleFavorite: _viewModel.toggleFavorite,
                     isLast: index == _viewModel.totalCards - 1,
                     isKnown: _viewModel.isKnown(card.id),
+                    responsive: responsive,
                   ),
                 );
               },
@@ -156,36 +183,36 @@ class _ConceptStudyPageState extends State<ConceptStudyPage> {
     });
   }
 
-  Widget _buildCompletedScreen(BuildContext context, ThemeColors colors) {
+  Widget _buildCompletedScreen(BuildContext context, ThemeColors colors, _ResponsiveHelper responsive) {
     return Scaffold(
       backgroundColor: colors.gray20,
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(20),
+          padding: EdgeInsets.all(responsive.horizontalPadding),
           child: Column(
             children: [
               const Spacer(),
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.all(32),
+                padding: EdgeInsets.all(32 * responsive.scaleFactor),
                 decoration: BoxDecoration(
                   color: colors.gray0,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(12 * responsive.scaleFactor),
                   border: Border.all(color: colors.gray70),
                 ),
                 child: Column(
                   children: [
                     Container(
-                      width: 80,
-                      height: 80,
+                      width: responsive.completedIconContainerSize,
+                      height: responsive.completedIconContainerSize,
                       decoration: BoxDecoration(
                         color: colors.greenLight,
                         shape: BoxShape.circle,
                       ),
                       child: Center(
                         child: Assets.icons.check.svg(
-                          width: 48,
-                          height: 48,
+                          width: responsive.checkIconSize,
+                          height: responsive.checkIconSize,
                           colorFilter: ColorFilter.mode(
                             colors.greenNormal,
                             BlendMode.srcIn,
@@ -193,17 +220,17 @@ class _ConceptStudyPageState extends State<ConceptStudyPage> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 24),
+                    SizedBox(height: 24 * responsive.scaleFactor),
                     Text(
                       '학습 완료!',
                       style: Typo.titleStrong(context, color: colors.gray900),
                     ),
-                    const SizedBox(height: 12),
+                    SizedBox(height: 12 * responsive.scaleFactor),
                     Text(
                       '${_viewModel.totalAllCards}개의 카드를 모두 학습했습니다',
                       style: Typo.bodyRegular(context, color: colors.gray600),
                     ),
-                    const SizedBox(height: 8),
+                    SizedBox(height: 8 * responsive.scaleFactor),
                     Text(
                       '총 ${_viewModel.round}라운드 진행',
                       style: Typo.labelRegular(
@@ -220,10 +247,10 @@ class _ConceptStudyPageState extends State<ConceptStudyPage> {
                 child: GestureDetector(
                   onTap: () => Navigator.of(context).pop(),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    padding: EdgeInsets.symmetric(vertical: 16 * responsive.scaleFactor),
                     decoration: BoxDecoration(
                       color: colors.primaryNormal,
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(12 * responsive.scaleFactor),
                     ),
                     alignment: Alignment.center,
                     child: Text(
@@ -240,7 +267,7 @@ class _ConceptStudyPageState extends State<ConceptStudyPage> {
     );
   }
 
-  PreferredSize _buildAppBar(BuildContext context, ThemeColors colors) {
+  PreferredSize _buildAppBar(BuildContext context, ThemeColors colors, _ResponsiveHelper responsive) {
     return PreferredSize(
       preferredSize: const Size.fromHeight(kToolbarHeight),
       child: Container(
@@ -265,10 +292,10 @@ class _ConceptStudyPageState extends State<ConceptStudyPage> {
               Navigator.of(context).pop();
             },
             child: Padding(
-              padding: const EdgeInsets.all(15),
+              padding: EdgeInsets.all(15 * responsive.scaleFactor),
               child: Assets.icons.arrowBackIos.svg(
-                width: 24,
-                height: 24,
+                width: responsive.iconSize,
+                height: responsive.iconSize,
                 colorFilter: ColorFilter.mode(colors.gray900, BlendMode.srcIn),
               ),
             ),
@@ -277,7 +304,7 @@ class _ConceptStudyPageState extends State<ConceptStudyPage> {
             children: [
               Expanded(
                 child: Container(
-                  height: 12,
+                  height: 12 * responsive.scaleFactor,
                   decoration: BoxDecoration(
                     color: colors.primaryLight,
                     borderRadius: BorderRadius.circular(99),
@@ -294,12 +321,12 @@ class _ConceptStudyPageState extends State<ConceptStudyPage> {
                   ),
                 ),
               ),
-              const SizedBox(width: 15),
+              SizedBox(width: 15 * responsive.scaleFactor),
               Text(
                 _viewModel.progressText,
                 style: Typo.bodyRegular(context, color: colors.gray900),
               ),
-              const SizedBox(width: 15),
+              SizedBox(width: 15 * responsive.scaleFactor),
             ],
           ),
           titleSpacing: 0,
@@ -316,6 +343,7 @@ class _FlashCard extends StatefulWidget {
   final VoidCallback onToggleFavorite;
   final bool isLast;
   final bool isKnown;
+  final _ResponsiveHelper responsive;
 
   const _FlashCard({
     required this.card,
@@ -324,6 +352,7 @@ class _FlashCard extends StatefulWidget {
     required this.onToggleFavorite,
     required this.isLast,
     required this.isKnown,
+    required this.responsive,
   });
 
   @override
@@ -364,6 +393,7 @@ class _FlashCardState extends State<_FlashCard> {
   @override
   Widget build(BuildContext context) {
     final colors = ThemeColors.of(context);
+    final responsive = widget.responsive;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -385,15 +415,15 @@ class _FlashCardState extends State<_FlashCard> {
           clipBehavior: Clip.hardEdge,
           decoration: BoxDecoration(
             color: colors.gray0,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(12 * responsive.scaleFactor),
             border: Border.all(color: colors.gray70),
           ),
           child: Stack(
             children: [
-              _buildCardContent(context, colors, cardHeight),
-              _buildCover(context, colors, cardHeight, maxDrag),
+              _buildCardContent(context, colors, cardHeight, responsive),
+              _buildCover(context, colors, cardHeight, maxDrag, responsive),
               if (_isFullyRevealed(cardHeight) || widget.isKnown)
-                _buildKnownBadge(context, colors),
+                _buildKnownBadge(context, colors, responsive),
             ],
           ),
         );
@@ -405,27 +435,28 @@ class _FlashCardState extends State<_FlashCard> {
     BuildContext context,
     ThemeColors colors,
     double cardHeight,
+    _ResponsiveHelper responsive,
   ) {
     final isFullyRevealed = _isFullyRevealed(cardHeight);
 
     return Padding(
-      padding: const EdgeInsets.only(top: 20),
+      padding: EdgeInsets.only(top: 20 * responsive.scaleFactor),
       child: Column(
         children: [
           GestureDetector(
             onTap: widget.onToggleFavorite,
             child: widget.card.isFavorite
                 ? Assets.icons.starFill.svg(
-                    width: 24,
-                    height: 24,
+                    width: responsive.iconSize,
+                    height: responsive.iconSize,
                     colorFilter: ColorFilter.mode(
                       colors.yellow,
                       BlendMode.srcIn,
                     ),
                   )
                 : Assets.icons.star.svg(
-                    width: 24,
-                    height: 24,
+                    width: responsive.iconSize,
+                    height: responsive.iconSize,
                     colorFilter: ColorFilter.mode(
                       colors.gray70,
                       BlendMode.srcIn,
@@ -435,7 +466,7 @@ class _FlashCardState extends State<_FlashCard> {
           Expanded(
             child: Center(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 32),
+                padding: EdgeInsets.symmetric(horizontal: 32 * responsive.scaleFactor),
                 child: Text(
                   widget.card.question,
                   style: Typo.titleRegular(context, color: colors.gray900),
@@ -446,7 +477,7 @@ class _FlashCardState extends State<_FlashCard> {
           ),
           if (isFullyRevealed || widget.isKnown)
             Padding(
-              padding: const EdgeInsets.only(bottom: 12),
+              padding: EdgeInsets.only(bottom: 12 * responsive.scaleFactor),
               child: Text(
                 widget.isKnown ? '이미 학습된 카드입니다' : '',
                 style: Typo.footnoteRegular(context, color: colors.gray70),
@@ -482,6 +513,7 @@ class _FlashCardState extends State<_FlashCard> {
     ThemeColors colors,
     double cardHeight,
     double maxDrag,
+    _ResponsiveHelper responsive,
   ) {
     final coverHeight = _getCoverHeight(cardHeight);
     final isPartiallyRevealed = _isPartiallyRevealed(cardHeight);
@@ -540,7 +572,7 @@ class _FlashCardState extends State<_FlashCard> {
               ),
             ],
           ),
-          child: _buildCoverContent(context, colors, isPartiallyRevealed),
+          child: _buildCoverContent(context, colors, isPartiallyRevealed, responsive),
         ),
       ),
     );
@@ -550,6 +582,7 @@ class _FlashCardState extends State<_FlashCard> {
     BuildContext context,
     ThemeColors colors,
     bool isPartiallyRevealed,
+    _ResponsiveHelper responsive,
   ) {
     if (isPartiallyRevealed) {
       return Row(
@@ -559,12 +592,12 @@ class _FlashCardState extends State<_FlashCard> {
             '아는 용어가 아니면 다시 덮어요',
             style: Typo.bodyStrong(context, color: colors.gray0),
           ),
-          const SizedBox(width: 10),
+          SizedBox(width: 10 * responsive.scaleFactor),
           Transform.rotate(
             angle: -3.14159 / 2,
             child: Assets.icons.fastForward.svg(
-              width: 24,
-              height: 24,
+              width: responsive.iconSize,
+              height: responsive.iconSize,
               colorFilter: ColorFilter.mode(colors.gray0, BlendMode.srcIn),
             ),
           ),
@@ -575,16 +608,16 @@ class _FlashCardState extends State<_FlashCard> {
     return Column(
       mainAxisAlignment: MainAxisAlignment.start,
       children: [
-        const SizedBox(height: 16),
+        SizedBox(height: 16 * responsive.scaleFactor),
         Transform.rotate(
           angle: 3.14159 / 2,
           child: Assets.icons.fastForward.svg(
-            width: 36,
-            height: 36,
+            width: responsive.largeIconSize,
+            height: responsive.largeIconSize,
             colorFilter: ColorFilter.mode(colors.gray0, BlendMode.srcIn),
           ),
         ),
-        const SizedBox(height: 10),
+        SizedBox(height: 10 * responsive.scaleFactor),
         Text(
           '의미를 가리고 기억해 보세요.\n생각이 안나면 커버를 조금 내려\n확인하고 다음 카드로 넘기세요!',
           style: Typo.bodyStrong(context, color: colors.gray0),
@@ -594,29 +627,29 @@ class _FlashCardState extends State<_FlashCard> {
     );
   }
 
-  Widget _buildKnownBadge(BuildContext context, ThemeColors colors) {
+  Widget _buildKnownBadge(BuildContext context, ThemeColors colors, _ResponsiveHelper responsive) {
     return Positioned(
       top: 0,
       right: 0,
       child: GestureDetector(
         onTap: widget.isKnown ? widget.onUnmarkKnown : widget.onKnown,
         child: Container(
-          width: 93,
-          height: 72,
-          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+          width: responsive.badgeWidth,
+          height: responsive.badgeHeight,
+          padding: EdgeInsets.symmetric(horizontal: 9 * responsive.scaleFactor, vertical: 6 * responsive.scaleFactor),
           decoration: BoxDecoration(
             color: colors.primaryNormal,
-            borderRadius: const BorderRadius.only(
-              topRight: Radius.circular(10),
-              bottomLeft: Radius.circular(12),
+            borderRadius: BorderRadius.only(
+              topRight: Radius.circular(10 * responsive.scaleFactor),
+              bottomLeft: Radius.circular(12 * responsive.scaleFactor),
             ),
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Assets.icons.check.svg(
-                width: 36,
-                height: 36,
+                width: responsive.largeIconSize,
+                height: responsive.largeIconSize,
                 colorFilter: ColorFilter.mode(colors.gray0, BlendMode.srcIn),
               ),
               Text(

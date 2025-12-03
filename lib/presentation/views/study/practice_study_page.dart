@@ -7,6 +7,33 @@ import 'package:kkeutgong_mobile/shared/styles/colors.dart';
 import 'package:kkeutgong_mobile/shared/styles/typography.dart';
 import 'package:kkeutgong_mobile/gen/assets.gen.dart';
 
+class _ResponsiveHelper {
+  final BuildContext context;
+  late final double screenWidth;
+  late final double screenHeight;
+  late final bool isSmallScreen;
+  late final bool isMediumScreen;
+  late final double scaleFactor;
+
+  _ResponsiveHelper(this.context) {
+    screenWidth = MediaQuery.of(context).size.width;
+    screenHeight = MediaQuery.of(context).size.height;
+    isSmallScreen = screenWidth < 360;
+    isMediumScreen = screenWidth >= 360 && screenWidth < 400;
+    scaleFactor = (screenWidth / 375).clamp(0.85, 1.2);
+  }
+
+  double get horizontalPadding => isSmallScreen ? 20 : (isMediumScreen ? 26 : 31);
+  double get iconSize => (24 * scaleFactor).clamp(20.0, 28.0);
+  double get smallIconSize => (16 * scaleFactor).clamp(14.0, 20.0);
+  double get numberBadgeSize => (24 * scaleFactor).clamp(20.0, 28.0);
+  double get choicePaddingH => isSmallScreen ? 14 : (isMediumScreen ? 17 : 20);
+  double get choicePaddingV => isSmallScreen ? 12 : (isMediumScreen ? 14 : 16);
+  double get buttonPaddingH => isSmallScreen ? 24 : (isMediumScreen ? 28 : 33);
+  double get explanationPaddingH => isSmallScreen ? 24 : (isMediumScreen ? 30 : 35);
+  double get explanationPaddingV => isSmallScreen ? 28 : (isMediumScreen ? 34 : 40);
+}
+
 class PracticeStudyPage extends StatefulWidget {
   final String subjectName;
   const PracticeStudyPage({super.key, required this.subjectName});
@@ -38,6 +65,7 @@ class _PracticeStudyPageState extends State<PracticeStudyPage> {
   @override
   Widget build(BuildContext context) {
     final colors = ThemeColors.of(context);
+    final responsive = _ResponsiveHelper(context);
     if (_viewModel.isLoading && !_viewModel.isInitialized) {
       return Scaffold(
         backgroundColor: colors.gray20,
@@ -59,7 +87,7 @@ class _PracticeStudyPageState extends State<PracticeStudyPage> {
     final hasAnswered = _viewModel.hasAnswered;
     return Scaffold(
       backgroundColor: colors.gray20,
-      appBar: _buildAppBar(context, colors),
+      appBar: _buildAppBar(context, colors, responsive),
       body: SafeArea(
           child: WillPopScope(
           onWillPop: () async {
@@ -73,21 +101,21 @@ class _PracticeStudyPageState extends State<PracticeStudyPage> {
                 children: [
                   Expanded(
                     child: SingleChildScrollView(
-                      padding: const EdgeInsets.fromLTRB(31, 24, 31, 0),
+                      padding: EdgeInsets.fromLTRB(responsive.horizontalPadding, 24 * responsive.scaleFactor, responsive.horizontalPadding, 0),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildTitle(context, colors, q),
-                          const SizedBox(height: 60),
-                          _buildChoices(context, colors, q),
-                          const SizedBox(height: 50),
+                          _buildTitle(context, colors, q, responsive),
+                          SizedBox(height: 60 * responsive.scaleFactor),
+                          _buildChoices(context, colors, q, responsive),
+                          SizedBox(height: 50 * responsive.scaleFactor),
                           if (hasAnswered)
-                            _buildExplanation(context, colors, q),
+                            _buildExplanation(context, colors, q, responsive),
                         ],
                       ),
                     ),
                   ),
-                  _buildBottomButton(colors),
+                  _buildBottomButton(colors, responsive),
                 ],
               ),
             ],
@@ -97,7 +125,7 @@ class _PracticeStudyPageState extends State<PracticeStudyPage> {
     );
   }
 
-  PreferredSize _buildAppBar(BuildContext context, ThemeColors colors) {
+  PreferredSize _buildAppBar(BuildContext context, ThemeColors colors, _ResponsiveHelper responsive) {
     return PreferredSize(
       preferredSize: const Size.fromHeight(kToolbarHeight),
       child: Container(
@@ -122,10 +150,10 @@ class _PracticeStudyPageState extends State<PracticeStudyPage> {
               Navigator.of(context).pop();
             },
             child: Padding(
-              padding: const EdgeInsets.all(15),
+              padding: EdgeInsets.all(15 * responsive.scaleFactor),
               child: Assets.icons.arrowBackIos.svg(
-                width: 24,
-                height: 24,
+                width: responsive.iconSize,
+                height: responsive.iconSize,
                 colorFilter: ColorFilter.mode(colors.gray900, BlendMode.srcIn),
               ),
             ),
@@ -134,7 +162,7 @@ class _PracticeStudyPageState extends State<PracticeStudyPage> {
             children: [
               Expanded(
                 child: Container(
-                  height: 12,
+                  height: 12 * responsive.scaleFactor,
                   decoration: BoxDecoration(
                     color: colors.primaryLight,
                     borderRadius: BorderRadius.circular(99),
@@ -151,12 +179,12 @@ class _PracticeStudyPageState extends State<PracticeStudyPage> {
                   ),
                 ),
               ),
-              const SizedBox(width: 15),
+              SizedBox(width: 15 * responsive.scaleFactor),
               Text(
                 _viewModel.progressText,
                 style: Typo.bodyRegular(context, color: colors.gray900),
               ),
-              const SizedBox(width: 15),
+              SizedBox(width: 15 * responsive.scaleFactor),
             ],
           ),
           titleSpacing: 0,
@@ -165,7 +193,7 @@ class _PracticeStudyPageState extends State<PracticeStudyPage> {
     );
   }
 
-  Widget _buildTitle(BuildContext context, ThemeColors colors, Question q) {
+  Widget _buildTitle(BuildContext context, ThemeColors colors, Question q, _ResponsiveHelper responsive) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -173,7 +201,7 @@ class _PracticeStudyPageState extends State<PracticeStudyPage> {
           '${q.number}.',
           style: Typo.titleStrong(context, color: colors.gray900),
         ),
-        const SizedBox(width: 10),
+        SizedBox(width: 10 * responsive.scaleFactor),
         Expanded(
           child: Text(
             q.text,
@@ -184,14 +212,14 @@ class _PracticeStudyPageState extends State<PracticeStudyPage> {
     );
   }
 
-  Widget _buildChoices(BuildContext context, ThemeColors colors, Question q) {
+  Widget _buildChoices(BuildContext context, ThemeColors colors, Question q, _ResponsiveHelper responsive) {
     final hasAnswered = _viewModel.hasAnswered;
     return Column(
       children: q.choices
           .map<Widget>(
             (choice) => Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: _buildChoiceItem(context, colors, q, choice, hasAnswered),
+              padding: EdgeInsets.only(bottom: 10 * responsive.scaleFactor),
+              child: _buildChoiceItem(context, colors, q, choice, hasAnswered, responsive),
             ),
           )
           .toList(),
@@ -204,6 +232,7 @@ class _PracticeStudyPageState extends State<PracticeStudyPage> {
     Question q,
     Choice choice,
     bool hasAnswered,
+    _ResponsiveHelper responsive,
   ) {
     final isSelected = q.selectedAnswer == choice.number;
     final isCorrect = choice.isCorrect;
@@ -231,10 +260,10 @@ class _PracticeStudyPageState extends State<PracticeStudyPage> {
       onTap: hasAnswered ? null : () => _viewModel.selectAnswer(choice.number),
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        padding: EdgeInsets.symmetric(horizontal: responsive.choicePaddingH, vertical: responsive.choicePaddingV),
         decoration: BoxDecoration(
           color: bg,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(12 * responsive.scaleFactor),
           border: Border.all(color: border),
         ),
         child: Stack(
@@ -244,8 +273,8 @@ class _PracticeStudyPageState extends State<PracticeStudyPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  width: 24,
-                  height: 24,
+                  width: responsive.numberBadgeSize,
+                  height: responsive.numberBadgeSize,
                   decoration: BoxDecoration(
                     color: numBg,
                     borderRadius: BorderRadius.circular(99),
@@ -256,7 +285,7 @@ class _PracticeStudyPageState extends State<PracticeStudyPage> {
                     style: Typo.bodyRegular(context, color: colors.gray900),
                   ),
                 ),
-                const SizedBox(width: 8),
+                SizedBox(width: 8 * responsive.scaleFactor),
                 Expanded(
                   child: Text(
                     choice.text,
@@ -269,30 +298,30 @@ class _PracticeStudyPageState extends State<PracticeStudyPage> {
             ),
             if (showCorrectBadge)
               Positioned(
-                top: -30,
-                right: -30,
+                top: -30 * responsive.scaleFactor,
+                right: -30 * responsive.scaleFactor,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 2,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 6 * responsive.scaleFactor,
+                    vertical: 2 * responsive.scaleFactor,
                   ),
                   decoration: BoxDecoration(
                     color: colors.greenLightHover,
-                    borderRadius: BorderRadius.circular(6),
+                    borderRadius: BorderRadius.circular(6 * responsive.scaleFactor),
                     border: Border.all(color: colors.greenNormalHover),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Assets.icons.check.svg(
-                        width: 16,
-                        height: 16,
+                        width: responsive.smallIconSize,
+                        height: responsive.smallIconSize,
                         colorFilter: ColorFilter.mode(
                           colors.gray900,
                           BlendMode.srcIn,
                         ),
                       ),
-                      const SizedBox(width: 4),
+                      SizedBox(width: 4 * responsive.scaleFactor),
                       Text(
                         '정답',
                         style: Typo.footnoteRegular(
@@ -314,25 +343,26 @@ class _PracticeStudyPageState extends State<PracticeStudyPage> {
     BuildContext context,
     ThemeColors colors,
     Question q,
+    _ResponsiveHelper responsive,
   ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('해설', style: Typo.bodyStrong(context, color: colors.gray900)),
-        const SizedBox(height: 4),
+        SizedBox(height: 4 * responsive.scaleFactor),
         Container(
           width: double.infinity,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(12 * responsive.scaleFactor),
             border: Border.all(color: colors.gray70),
           ),
           child: Stack(
             children: [
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 35,
-                  vertical: 40,
+                padding: EdgeInsets.symmetric(
+                  horizontal: responsive.explanationPaddingH,
+                  vertical: responsive.explanationPaddingV,
                 ),
                 child: Text(
                   q.explanation,
@@ -342,7 +372,7 @@ class _PracticeStudyPageState extends State<PracticeStudyPage> {
               if (!_viewModel.showExplanation)
                 Positioned.fill(
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(12 * responsive.scaleFactor),
                     child: BackdropFilter(
                       filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
                       child: Container(color: Colors.transparent),
@@ -355,27 +385,27 @@ class _PracticeStudyPageState extends State<PracticeStudyPage> {
                     child: GestureDetector(
                       onTap: _viewModel.toggleExplanation,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 12 * responsive.scaleFactor,
+                          vertical: 6 * responsive.scaleFactor,
                         ),
                         decoration: BoxDecoration(
                           color: colors.primaryNormal,
-                          borderRadius: BorderRadius.circular(6),
+                          borderRadius: BorderRadius.circular(6 * responsive.scaleFactor),
                           border: Border.all(color: colors.primaryNormalHover),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Assets.icons.visibility.svg(
-                              width: 16,
-                              height: 16,
+                              width: responsive.smallIconSize,
+                              height: responsive.smallIconSize,
                               colorFilter: ColorFilter.mode(
                                 colors.gray0,
                                 BlendMode.srcIn,
                               ),
                             ),
-                            const SizedBox(width: 4),
+                            SizedBox(width: 4 * responsive.scaleFactor),
                             Text(
                               '해설보기',
                               style: Typo.footnoteRegular(
@@ -396,11 +426,11 @@ class _PracticeStudyPageState extends State<PracticeStudyPage> {
     );
   }
 
-  Widget _buildBottomButton(ThemeColors colors) {
+  Widget _buildBottomButton(ThemeColors colors, _ResponsiveHelper responsive) {
     final enabled = _viewModel.hasAnswered;
     final last = !_viewModel.hasNext;
     return Container(
-      padding: const EdgeInsets.fromLTRB(33, 12, 33, 20),
+      padding: EdgeInsets.fromLTRB(responsive.buttonPaddingH, 12 * responsive.scaleFactor, responsive.buttonPaddingH, 20 * responsive.scaleFactor),
       child: SizedBox(
         width: double.infinity,
         child: GestureDetector(
@@ -416,10 +446,10 @@ class _PracticeStudyPageState extends State<PracticeStudyPage> {
           child: Opacity(
             opacity: enabled ? 1 : 0.3,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              padding: EdgeInsets.symmetric(horizontal: responsive.choicePaddingH, vertical: responsive.choicePaddingV),
               decoration: BoxDecoration(
                 color: colors.gray900,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(12 * responsive.scaleFactor),
               ),
               alignment: Alignment.center,
               child: Text(

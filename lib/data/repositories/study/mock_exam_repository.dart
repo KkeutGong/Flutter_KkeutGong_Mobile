@@ -22,16 +22,16 @@ class MockExamRepository {
     }
 
     final questions = <Question>[];
-    for (int i = 0; i < 100; i++) {
+    for (int i = 0; i < 5; i++) {
       questions.add(Question(
         id: 'q_$i',
         number: i + 1,
         text: '다음 중 옴의 법칙을 올바르게 나타낸 것은?',
         choices: [
-          Choice(number: 1, text: 'V = IR', isCorrect: i % 4 == 0),
-          Choice(number: 2, text: 'V = I/R', isCorrect: i % 4 == 1),
-          Choice(number: 3, text: 'V = R/I', isCorrect: i % 4 == 2),
-          Choice(number: 4, text: 'I = VR', isCorrect: i % 4 == 3),
+          Choice(number: 1, text: 'V = IR', isCorrect: true),
+          Choice(number: 2, text: 'V = I/R', isCorrect: false),
+          Choice(number: 3, text: 'V = R/I', isCorrect: false),
+          Choice(number: 4, text: 'I = VR', isCorrect: false),
         ],
         explanation: '옴의 법칙에 대한 해설입니다.',
       ));
