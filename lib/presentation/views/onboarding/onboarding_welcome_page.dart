@@ -75,24 +75,32 @@ class OnboardingWelcomePage extends StatelessWidget {
                 const Spacer(),
                 Padding(
                   padding: EdgeInsets.symmetric(horizontal: 33 * widthRatio),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: CustomButton(
-                      text: '계속하기',
-                      theme: CustomButtonTheme.primary,
-                      size: ButtonSize.large,
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const OnboardingContainerPage(),
-                          ),
-                        );
-                      },
+                  child: Semantics(
+                    button: true,
+                    identifier: 'onboarding-welcome-continue',
+                    label: '계속하기',
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: CustomButton(
+                        text: '계속하기',
+                        theme: CustomButtonTheme.primary,
+                        size: ButtonSize.large,
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const OnboardingContainerPage(),
+                            ),
+                          );
+                        },
+                      ),
                     ),
                   ),
                 ),
                 SizedBox(height: 16 * heightRatio),
+                // M6: 로그인 하기는 의도적으로 LoginPage로 이동합니다.
+                // 계속하기(신규 가입) → OnboardingContainerPage(자격증/시간 선택)
+                // 로그인 하기(기존 계정) → LoginPage(소셜 로그인)
                 CustomTextButton(
                   text: '로그인 하기',
                   theme: CustomTextButtonTheme.grayscale,

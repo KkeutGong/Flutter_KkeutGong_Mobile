@@ -1,23 +1,52 @@
+import 'package:kkeutgong_mobile/core/api/api_client.dart';
+import 'package:kkeutgong_mobile/core/session/session.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+/// Local-cache mirror of progress for instant UI reads, with backend as source of truth.
 class StudyProgressRepository {
+  StudyProgressRepository();
+
   static const String _practicePrefix = 'practice_progress_';
   static const String _conceptPrefix = 'concept_progress_';
   static const String _overallKey = 'overall_progress';
 
-  Future<void> savePracticeProgress({required String subjectName, required int currentIndex, required int total, required int answeredCount}) async {
+  final ApiClient _api = ApiClient();
+  final Session _session = Session();
+
+  Future<void> savePracticeProgress({
+    required String subjectName,
+    required int currentIndex,
+    required int total,
+    required int answeredCount,
+  }) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('$_practicePrefix${subjectName}_index', currentIndex);
     await prefs.setInt('$_practicePrefix${subjectName}_total', total);
     await prefs.setInt('$_practicePrefix${subjectName}_answered', answeredCount);
-    final percent = total > 0 ? ((answeredCount) / total).clamp(0.0, 1.0) : 0.0;
+    final percent = total > 0 ? (answeredCount / total).clamp(0.0, 1.0) : 0.0;
     await _updateOverallProgress(prefs, subjectName, percent);
   }
 
-  Future<void> savePracticeAnswers({required String subjectName, required Map<String, int> answers}) async {
+  Future<void> savePracticeAnswers({
+    required String subjectName,
+    required Map<String, int> answers,
+  }) async {
     final prefs = await SharedPreferences.getInstance();
     final serialized = answers.entries.map((e) => '${e.key}:${e.value}').toList();
     await prefs.setStringList('$_practicePrefix${subjectName}_answers', serialized);
+
+    final subjectId = _session.subjectIdFor(subjectName);
+    if (subjectId == null) return;
+    try {
+      await _api.post('/study/practice/progress', body: {
+        'userId': _session.userId,
+        'certificateId': _session.currentCertificateId,
+        'subjectId': subjectId,
+        'answers': answers,
+      });
+    } catch (_) {
+      // network failure: keep local copy, retry on next save
+    }
   }
 
   Future<Map<String, int>> getPracticeAnswers(String subjectName) async {
@@ -28,15 +57,18 @@ class StudyProgressRepository {
       final sep = item.indexOf(':');
       if (sep > 0) {
         final id = item.substring(0, sep);
-        final valStr = item.substring(sep + 1);
-        final val = int.tryParse(valStr);
+        final val = int.tryParse(item.substring(sep + 1));
         if (val != null) map[id] = val;
       }
     }
     return map;
   }
 
-  Future<void> saveConceptProgress({required String subjectName, required int knownCount, required int total}) async {
+  Future<void> saveConceptProgress({
+    required String subjectName,
+    required int knownCount,
+    required int total,
+  }) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('$_conceptPrefix${subjectName}_known', knownCount);
     await prefs.setInt('$_conceptPrefix${subjectName}_total', total);
@@ -44,9 +76,26 @@ class StudyProgressRepository {
     await _updateOverallProgress(prefs, subjectName, percent);
   }
 
-  Future<void> saveConceptKnownIds({required String subjectName, required List<String> knownIds}) async {
+  Future<void> saveConceptKnownIds({
+    required String subjectName,
+    required List<String> knownIds,
+  }) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList('$_conceptPrefix${subjectName}_known_ids', knownIds);
+
+    final favIds = prefs.getStringList('$_conceptPrefix${subjectName}_favorite_ids') ?? const <String>[];
+    final subjectId = _session.subjectIdFor(subjectName);
+    if (subjectId == null) return;
+    try {
+      // Ensure both are always JSON arrays, never objects/sets.
+      await _api.post('/study/concepts/progress', body: {
+        'userId': _session.userId,
+        'certificateId': _session.currentCertificateId,
+        'subjectId': subjectId,
+        'knownIds': List<String>.from(knownIds),
+        'favoriteIds': List<String>.from(favIds),
+      });
+    } catch (_) {}
   }
 
   Future<double> getPracticePercent(String subjectName) async {
@@ -74,15 +123,12 @@ class StudyProgressRepository {
     return prefs.getDouble(_overallKey) ?? 0.0;
   }
 
-  /// 특정 subject의 concept + practice 평균 진행률
   Future<double> getSubjectProgress(String subjectName) async {
     final concept = await getConceptPercent(subjectName);
     final practice = await getPracticePercent(subjectName);
-    // concept과 practice 각각 50%씩 (review는 별도)
     return (concept + practice) / 2.0;
   }
 
-  /// 전체 subjects에 대한 진행률 계산 (subjects 목록 기준)
   Future<double> calculateOverallProgress(List<String> subjectNames) async {
     if (subjectNames.isEmpty) return 0.0;
     double sum = 0.0;
@@ -102,80 +148,57 @@ class StudyProgressRepository {
     return prefs.getInt('$_practicePrefix${subjectName}_answered') ?? 0;
   }
 
-  /// 모든 학습 진행 상황을 초기화합니다.
-  /// - practice: index, total, answered, answers
-  /// - concept: total, known, known_ids
-  /// - overall: per-subject overall_* 및 overall_progress
   Future<void> resetAllProgress() async {
     final prefs = await SharedPreferences.getInstance();
     final keys = prefs.getKeys().toList();
-
     for (final key in keys) {
-      // Practice 관련 모든 키 삭제
-      if (key.startsWith(_practicePrefix)) {
+      if (key.startsWith(_practicePrefix) ||
+          key.startsWith(_conceptPrefix) ||
+          key.startsWith('overall_')) {
         await prefs.remove(key);
-        continue;
-      }
-      // Concept 관련 모든 키 삭제
-      if (key.startsWith(_conceptPrefix)) {
-        await prefs.remove(key);
-        continue;
-      }
-      // Overall 관련 키 삭제
-      if (key.startsWith('overall_')) {
-        await prefs.remove(key);
-        continue;
       }
     }
-
     await prefs.remove(_overallKey);
+
+    try {
+      await _api.post('/progress/reset', body: {
+        'userId': _session.userId,
+        'certificateId': _session.currentCertificateId,
+      });
+    } catch (_) {}
   }
 
-  /// 이전 버전 호환용 (deprecated, use resetAllProgress instead)
-  Future<void> resetAllPercents() async {
-    await resetAllProgress();
-  }
+  Future<void> resetAllPercents() => resetAllProgress();
 
   Future<void> _updateOverallProgress(SharedPreferences prefs, String subjectName, double percent) async {
-    // 각 subject의 concept과 practice 진행률을 별도로 저장하고 평균 계산
-    // concept: concept_progress_{subject}_known / concept_progress_{subject}_total
-    // practice: practice_progress_{subject}_answered / practice_progress_{subject}_total
-    // 전체 진행률 = 모든 subject의 (concept + practice) / 2의 평균
-    
-    // 현재 저장된 모든 subject의 진행률 계산
     final allKeys = prefs.getKeys();
     final subjectNames = <String>{};
-    
+
     for (final key in allKeys) {
       if (key.startsWith(_conceptPrefix) && key.endsWith('_total')) {
-        final name = key.substring(_conceptPrefix.length, key.length - '_total'.length);
-        subjectNames.add(name);
+        subjectNames.add(key.substring(_conceptPrefix.length, key.length - '_total'.length));
       }
       if (key.startsWith(_practicePrefix) && key.endsWith('_total')) {
-        final name = key.substring(_practicePrefix.length, key.length - '_total'.length);
-        subjectNames.add(name);
+        subjectNames.add(key.substring(_practicePrefix.length, key.length - '_total'.length));
       }
     }
-    
+
     if (subjectNames.isEmpty) {
       await prefs.setDouble(_overallKey, 0.0);
       return;
     }
-    
+
     double totalProgress = 0.0;
     for (final name in subjectNames) {
-      final conceptTotal = prefs.getInt('$_conceptPrefix${name}_total') ?? 0;
-      final conceptKnown = prefs.getInt('$_conceptPrefix${name}_known') ?? 0;
-      final conceptPercent = conceptTotal > 0 ? conceptKnown / conceptTotal : 0.0;
-      
-      final practiceTotal = prefs.getInt('$_practicePrefix${name}_total') ?? 0;
-      final practiceAnswered = prefs.getInt('$_practicePrefix${name}_answered') ?? 0;
-      final practicePercent = practiceTotal > 0 ? practiceAnswered / practiceTotal : 0.0;
-      
-      // subject별 평균 (concept 50% + practice 50%)
-      totalProgress += (conceptPercent + practicePercent) / 2.0;
+      final cT = prefs.getInt('$_conceptPrefix${name}_total') ?? 0;
+      final cK = prefs.getInt('$_conceptPrefix${name}_known') ?? 0;
+      final cP = cT > 0 ? cK / cT : 0.0;
+      final pT = prefs.getInt('$_practicePrefix${name}_total') ?? 0;
+      final pA = prefs.getInt('$_practicePrefix${name}_answered') ?? 0;
+      final pP = pT > 0 ? pA / pT : 0.0;
+      totalProgress += (cP + pP) / 2.0;
     }
-    
+
     final overall = totalProgress / subjectNames.length;
     await prefs.setDouble(_overallKey, overall.clamp(0.0, 1.0));
   }

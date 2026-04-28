@@ -250,12 +250,17 @@ class _CurriculumPageState extends State<CurriculumPage> {
               ],
             ),
           ),
-          CustomButton(
-            text: '모의고사 보기',
-            size: ButtonSize.medium,
-            theme: CustomButtonTheme.primary,
-            disabled: !isExamReady,
-            onPressed: isExamReady ? () => _navigateToMockExam(data.currentCertificate.name) : null,
+          Semantics(
+            button: true,
+            identifier: 'curriculum-mock-exam',
+            label: '모의고사 보기',
+            child: CustomButton(
+              text: '모의고사 보기',
+              size: ButtonSize.medium,
+              theme: CustomButtonTheme.primary,
+              disabled: !isExamReady,
+              onPressed: isExamReady ? () => _navigateToMockExam(data.currentCertificate.name) : null,
+            ),
           ),
         ],
       ),
@@ -419,7 +424,12 @@ class _CurriculumPageState extends State<CurriculumPage> {
             ),
           ),
           SizedBox(width: 32 * (MediaQuery.of(context).size.width / 375).clamp(0.85, 1.4)),
-          _buildUnitButton(colors, label, enabled, completed, locked, subject, mode),
+          Semantics(
+            button: true,
+            identifier: 'curriculum-${subject.id}-${mode.name}',
+            label: label,
+            child: _buildUnitButton(colors, label, enabled, completed, locked, subject, mode),
+          ),
         ],
       ),
     );
@@ -441,7 +451,7 @@ class _CurriculumPageState extends State<CurriculumPage> {
         break;
       case StudyMode.review:
         await Get.toNamed(
-          AppRoutes.practiceStudy,
+          AppRoutes.review,
           arguments: {'subjectName': subject.name},
         );
         break;

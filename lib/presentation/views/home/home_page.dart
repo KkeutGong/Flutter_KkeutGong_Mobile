@@ -168,7 +168,11 @@ class _HomePageState extends State<HomePage> {
     final arrowSize = screenWidth * 0.071;
     final homeData = _viewModel.homeData;
 
-    return GestureDetector(
+    return Semantics(
+      button: true,
+      identifier: 'home-cert-dropdown',
+      label: '자격증 변경',
+      child: GestureDetector(
       onTap: _viewModel.toggleCertificateDropdown,
       child: Container(
         padding: EdgeInsets.symmetric(
@@ -202,6 +206,7 @@ class _HomePageState extends State<HomePage> {
           ],
         ),
       ),
+      ),
     );
   }
 
@@ -226,7 +231,11 @@ class _HomePageState extends State<HomePage> {
   Widget _buildStreakButton(BuildContext context, ThemeColors colors, dynamic homeData, double screenWidth) {
     final iconSize = screenWidth * 0.061;
 
-    return GestureDetector(
+    return Semantics(
+      button: true,
+      identifier: 'home-streak',
+      label: '스트릭 상세',
+      child: GestureDetector(
       onTap: () {
         showModalBottomSheet(
           context: context,
@@ -275,6 +284,7 @@ class _HomePageState extends State<HomePage> {
             ),
           ],
         ),
+      ),
       ),
     );
   }
@@ -469,14 +479,19 @@ class _HomePageState extends State<HomePage> {
           children: [
             _buildCurriculumList(context, colors, homeData, screenWidth),
             SizedBox(height: screenWidth * 0.051),
-            SizedBox(
-              width: double.infinity,
-              child: CustomButton(
-                text: _viewModel.startButtonLabel,
-                size: ButtonSize.large,
-                theme: CustomButtonTheme.primary,
-                disabled: !_viewModel.canStartCurrentMode,
-                onPressed: () => _onStartStudy(),
+            Semantics(
+              button: true,
+              identifier: 'home-start-cta',
+              label: _viewModel.startButtonLabel,
+              child: SizedBox(
+                width: double.infinity,
+                child: CustomButton(
+                  text: _viewModel.startButtonLabel,
+                  size: ButtonSize.large,
+                  theme: CustomButtonTheme.primary,
+                  disabled: !_viewModel.canStartCurrentMode,
+                  onPressed: () => _onStartStudy(),
+                ),
               ),
             ),
           ],

@@ -5,6 +5,7 @@ import 'package:kkeutgong_mobile/gen/assets.gen.dart';
 import 'package:kkeutgong_mobile/presentation/viewmodels/study/concept_study_viewmodel.dart';
 import 'package:kkeutgong_mobile/shared/styles/colors.dart';
 import 'package:kkeutgong_mobile/shared/styles/typography.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class _ResponsiveHelper {
   final BuildContext context;
@@ -45,6 +46,9 @@ class _ConceptStudyPageState extends State<ConceptStudyPage> {
   late final PageController _pageController;
   bool _isRoundTransition = false;
   bool _isSwipeInProgress = false;
+  bool _showSwipeHint = false;
+
+  static const _prefSwipeHintSeen = 'concept_swipe_hint_seen';
 
   @override
   void initState() {
@@ -53,6 +57,16 @@ class _ConceptStudyPageState extends State<ConceptStudyPage> {
     _pageController = PageController();
     _viewModel.addListener(_onViewModelChanged);
     _viewModel.loadCards();
+    _checkSwipeHint();
+  }
+
+  Future<void> _checkSwipeHint() async {
+    final prefs = await SharedPreferences.getInstance();
+    final seen = prefs.getBool(_prefSwipeHintSeen) ?? false;
+    if (!seen && mounted) {
+      setState(() => _showSwipeHint = true);
+      await prefs.setBool(_prefSwipeHintSeen, true);
+    }
   }
 
   @override
@@ -105,7 +119,9 @@ class _ConceptStudyPageState extends State<ConceptStudyPage> {
     return Scaffold(
       backgroundColor: colors.gray20,
       appBar: _buildAppBar(context, colors, responsive),
-      body: WillPopScope(
+      body: Stack(
+        children: [
+          WillPopScope(
         onWillPop: () async {
           await _viewModel.saveProgress();
           HomeRepository().invalidateCache();
@@ -114,7 +130,11 @@ class _ConceptStudyPageState extends State<ConceptStudyPage> {
         child: AnimatedOpacity(
           opacity: _isRoundTransition ? 0.0 : 1.0,
           duration: const Duration(milliseconds: 200),
-          child: GestureDetector(
+          child: Semantics(
+            identifier: 'concept-card',
+            label: '개념 카드',
+            button: false,
+            child: GestureDetector(
             onHorizontalDragStart:
                 _viewModel.currentIndex == _viewModel.totalCards - 1
                 ? (details) {
@@ -163,7 +183,32 @@ class _ConceptStudyPageState extends State<ConceptStudyPage> {
               },
             ),
           ),
+          ),
         ),
+      ),
+          // First-visit swipe interaction hint (shows once via SharedPreferences)
+          if (_showSwipeHint)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: responsive.horizontalPadding,
+              child: IgnorePointer(
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                    child: Text(
+                      '↑ 위로 스와이프: 안다   ↓ 아래로: 모름',
+                      style: Typo.footnoteRegular(context, color: Colors.white),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -244,7 +289,11 @@ class _ConceptStudyPageState extends State<ConceptStudyPage> {
               const Spacer(),
               SizedBox(
                 width: double.infinity,
-                child: GestureDetector(
+                child: Semantics(
+                  identifier: 'concept-close',
+                  label: '닫기',
+                  button: true,
+                  child: GestureDetector(
                   onTap: () => Navigator.of(context).pop(),
                   child: Container(
                     padding: EdgeInsets.symmetric(vertical: 16 * responsive.scaleFactor),
@@ -258,6 +307,7 @@ class _ConceptStudyPageState extends State<ConceptStudyPage> {
                       style: Typo.bodyStrong(context, color: colors.gray0),
                     ),
                   ),
+                ),
                 ),
               ),
             ],
@@ -285,7 +335,11 @@ class _ConceptStudyPageState extends State<ConceptStudyPage> {
           backgroundColor: colors.gray0,
           elevation: 0,
           scrolledUnderElevation: 0,
-          leading: GestureDetector(
+          leading: Semantics(
+            identifier: 'concept-back',
+            label: '뒤로 가기',
+            button: true,
+            child: GestureDetector(
             onTap: () async {
               await _viewModel.saveProgress();
               HomeRepository().invalidateCache();
@@ -299,6 +353,7 @@ class _ConceptStudyPageState extends State<ConceptStudyPage> {
                 colorFilter: ColorFilter.mode(colors.gray900, BlendMode.srcIn),
               ),
             ),
+          ),
           ),
           title: Row(
             children: [
@@ -443,7 +498,11 @@ class _FlashCardState extends State<_FlashCard> {
       padding: EdgeInsets.only(top: 20 * responsive.scaleFactor),
       child: Column(
         children: [
-          GestureDetector(
+          Semantics(
+            identifier: 'concept-favorite-toggle',
+            label: '즐겨찾기 토글',
+            button: true,
+            child: GestureDetector(
             onTap: widget.onToggleFavorite,
             child: widget.card.isFavorite
                 ? Assets.icons.starFill.svg(
@@ -462,6 +521,7 @@ class _FlashCardState extends State<_FlashCard> {
                       BlendMode.srcIn,
                     ),
                   ),
+          ),
           ),
           Expanded(
             child: Center(
@@ -631,7 +691,11 @@ class _FlashCardState extends State<_FlashCard> {
     return Positioned(
       top: 0,
       right: 0,
-      child: GestureDetector(
+      child: Semantics(
+        identifier: 'concept-known-toggle',
+        label: widget.isKnown ? '안다 해제' : '안다',
+        button: true,
+        child: GestureDetector(
         onTap: widget.isKnown ? widget.onUnmarkKnown : widget.onKnown,
         child: Container(
           width: responsive.badgeWidth,
@@ -658,6 +722,7 @@ class _FlashCardState extends State<_FlashCard> {
               ),
             ],
           ),
+        ),
         ),
       ),
     );
