@@ -344,7 +344,10 @@ class _ProfilePageState extends State<ProfilePage> {
     String? identifier,
   }) {
     return Semantics(
+      button: true,
       identifier: identifier,
+      label: title,
+      excludeSemantics: true,
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
         decoration: BoxDecoration(
@@ -364,8 +367,10 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Widget _themeTile(BuildContext context, ThemeColors colors) {
     return Semantics(
+      button: true,
       identifier: 'settings-darkmode',
       label: '다크 모드',
+      excludeSemantics: true,
       child: Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
       decoration: BoxDecoration(
@@ -411,6 +416,7 @@ class _ProfilePageState extends State<ProfilePage> {
       button: true,
       identifier: identifier,
       label: title,
+      excludeSemantics: true,
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
         decoration: BoxDecoration(

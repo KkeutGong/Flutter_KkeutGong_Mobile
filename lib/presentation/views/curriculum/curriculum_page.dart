@@ -259,7 +259,17 @@ class _CurriculumPageState extends State<CurriculumPage> {
               size: ButtonSize.medium,
               theme: CustomButtonTheme.primary,
               disabled: !isExamReady,
-              onPressed: isExamReady ? () => _navigateToMockExam(data.currentCertificate.name) : null,
+              onPressed: () {
+                if (isExamReady) {
+                  _navigateToMockExam(data.currentCertificate.name);
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('모든 과목을 완료한 후 모의고사를 볼 수 있어요'),
+                    ),
+                  );
+                }
+              },
             ),
           ),
         ],
@@ -428,7 +438,7 @@ class _CurriculumPageState extends State<CurriculumPage> {
             button: true,
             identifier: 'curriculum-${subject.id}-${mode.name}',
             label: label,
-            child: _buildUnitButton(colors, label, enabled, completed, locked, subject, mode),
+            child: _buildUnitButton(context, colors, label, enabled, completed, locked, subject, mode),
           ),
         ],
       ),
@@ -492,7 +502,19 @@ class _CurriculumPageState extends State<CurriculumPage> {
     );
   }
 
+  String _lockedMessage(StudyMode mode) {
+    switch (mode) {
+      case StudyMode.practice:
+        return '개념정리를 먼저 완료해 주세요';
+      case StudyMode.review:
+        return '기출문제를 먼저 완료해 주세요';
+      case StudyMode.concept:
+        return '이전 단계를 먼저 완료해 주세요';
+    }
+  }
+
   Widget _buildUnitButton(
+    BuildContext context,
     ThemeColors colors,
     String label,
     bool enabled,
@@ -507,12 +529,19 @@ class _CurriculumPageState extends State<CurriculumPage> {
     if (completed) {
       background = colors.greenLight;
       textColor = colors.gray900;
-    } else if (locked) {
-      background = colors.gray900;
-      textColor = colors.gray0;
     } else {
       background = colors.gray900;
       textColor = colors.gray0;
+    }
+
+    void onTap() {
+      if (enabled) {
+        _navigateToStudyPage(subject, mode);
+      } else if (locked) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(_lockedMessage(mode))),
+        );
+      }
     }
 
     return CustomButton(
@@ -522,7 +551,7 @@ class _CurriculumPageState extends State<CurriculumPage> {
       disabled: !enabled,
       backgroundColor: background,
       textColor: textColor,
-      onPressed: enabled ? () => _navigateToStudyPage(subject, mode) : null,
+      onPressed: completed ? null : onTap,
     );
   }
 

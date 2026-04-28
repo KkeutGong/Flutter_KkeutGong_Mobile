@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:kkeutgong_mobile/shared/styles/colors.dart';
 import 'package:kkeutgong_mobile/shared/styles/typography.dart';
 import 'package:kkeutgong_mobile/gen/assets.gen.dart';
@@ -17,6 +18,8 @@ class OnboardingContainerPage extends StatefulWidget {
 class _OnboardingContainerPageState extends State<OnboardingContainerPage> {
   int _currentStep = 0;
   String? selectedValue;
+  // Stores the selected value for each step index (0=cert, 1=date, 2=hours, 3=style)
+  final Map<int, String> _pendingSelections = {};
 
   final List<Map<String, dynamic>> _stepData = [
     {
@@ -75,23 +78,72 @@ class _OnboardingContainerPageState extends State<OnboardingContainerPage> {
     },
   ];
 
+  // Maps option text to certificateId matching backend externalIds
+  static const Map<String, String> _certTextToId = {
+    '컴퓨터활용능력 2급': '2',
+    '한국사능력검정시험 심화': '3',
+    '정보처리기능사': '1',
+  };
+
+  // Maps hours option text to hoursPerWeek int
+  static const Map<String, int> _hoursTextToInt = {
+    '5분': 1,
+    '10분': 1,
+    '30분': 1,
+    '1시간': 7,
+    '2시간 이상': 14,
+  };
+
   void _nextStep() async {
     if (_currentStep < _stepData.length - 1) {
       setState(() {
         _currentStep++;
         selectedValue = null;
       });
-      
+
       if (_currentStep == 4) {
         await _requestNotificationPermission();
       }
     } else {
+      await _savePendingOnboarding();
+      if (!mounted) return;
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
           builder: (context) => const OnboardingLoadingPage(),
         ),
       );
+    }
+  }
+
+  Future<void> _savePendingOnboarding() async {
+    // Collect selections from each step's selectedValue by re-reading the
+    // current _stepData. Since this container page tracks a single
+    // selectedValue per step (resetting on step change), we need the values
+    // that were selected at each step. We store them step-by-step.
+    // The container page resets selectedValue on each step advance, so we
+    // use the _pendingSelections map populated in _buildOptions onTap.
+    final prefs = await SharedPreferences.getInstance();
+    final certText = _pendingSelections[0];
+    final examText = _pendingSelections[1];
+    final hoursText = _pendingSelections[2];
+    final styleText = _pendingSelections[3];
+
+    if (certText != null) {
+      final certId = _certTextToId[certText] ?? '1';
+      await prefs.setString('pending_onboarding_certificateId', certId);
+    }
+    if (examText != null && examText != '정해진 일정 없음') {
+      await prefs.setString('pending_onboarding_examDate', examText);
+    } else {
+      await prefs.remove('pending_onboarding_examDate');
+    }
+    if (hoursText != null) {
+      final hours = _hoursTextToInt[hoursText] ?? 7;
+      await prefs.setInt('pending_onboarding_hoursPerWeek', hours);
+    }
+    if (styleText != null) {
+      await prefs.setString('pending_onboarding_style', styleText);
     }
   }
 
@@ -280,19 +332,37 @@ class _OnboardingContainerPageState extends State<OnboardingContainerPage> {
     );
   }
 
+  static String _optionIdentifier(int step, String text) {
+    final prefix = ['onboarding-cert', 'onboarding-examdate', 'onboarding-hours', 'onboarding-style'];
+    final stepPrefix = step < prefix.length ? prefix[step] : 'onboarding-option';
+    final slug = text
+        .replaceAll(' ', '-')
+        .replaceAll('년', '')
+        .replaceAll('월', '')
+        .replaceAll('일', '')
+        .toLowerCase();
+    return '$stepPrefix-$slug';
+  }
+
   Widget _buildOptions(ThemeColors colors, List<Map<String, dynamic>> options) {
     return Column(
       children: options.map((option) {
         final isSelected = selectedValue == option['text'];
+        final identifier = _optionIdentifier(_currentStep, option['text'] as String);
         return Padding(
           padding: const EdgeInsets.only(bottom: 10),
-          child: GestureDetector(
-            onTap: () {
-              setState(() {
-                selectedValue = option['text'];
-              });
-            },
-            child: Container(
+          child: Semantics(
+            button: true,
+            identifier: identifier,
+            label: option['text'] as String,
+            child: GestureDetector(
+              onTap: () {
+                setState(() {
+                  selectedValue = option['text'];
+                  _pendingSelections[_currentStep] = option['text'] as String;
+                });
+              },
+              child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               decoration: BoxDecoration(
                 color: isSelected ? colors.primaryLight : colors.gray0,
@@ -326,6 +396,7 @@ class _OnboardingContainerPageState extends State<OnboardingContainerPage> {
                   ),
                 ],
               ),
+            ),
             ),
           ),
         );

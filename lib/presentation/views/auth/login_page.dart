@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:kkeutgong_mobile/core/api/api_client.dart';
 import 'package:kkeutgong_mobile/core/routes/app_routes.dart';
 import 'package:kkeutgong_mobile/data/repositories/auth/auth_repository.dart';
 import 'package:kkeutgong_mobile/gen/assets.gen.dart';
@@ -80,8 +81,39 @@ class _LoginPageState extends State<LoginPage> {
     if (hasOnboarded) {
       Get.offAllNamed(AppRoutes.main);
     } else {
-      Get.offAllNamed(AppRoutes.onboarding);
+      // Check for pending onboarding data saved before login
+      final certId = prefs.getString('pending_onboarding_certificateId');
+      if (certId != null) {
+        await _applyPendingOnboarding(prefs, certId);
+      } else {
+        Get.offAllNamed(AppRoutes.onboarding);
+      }
     }
+  }
+
+  Future<void> _applyPendingOnboarding(
+      SharedPreferences prefs, String certId) async {
+    try {
+      final examDate = prefs.getString('pending_onboarding_examDate');
+      final hoursPerWeek = prefs.getInt('pending_onboarding_hoursPerWeek') ?? 7;
+      final body = <String, dynamic>{
+        'certificateId': certId,
+        'hoursPerWeek': hoursPerWeek,
+        if (examDate != null) 'examDate': examDate,
+      };
+      final api = ApiClient();
+      await api.post('/curricula/generate', body: body);
+    } catch (_) {
+      // Ignore curriculum generation errors — still mark onboarded
+    }
+    await prefs.setBool('has_onboarded', true);
+    // Clean up pending keys
+    await prefs.remove('pending_onboarding_certificateId');
+    await prefs.remove('pending_onboarding_examDate');
+    await prefs.remove('pending_onboarding_hoursPerWeek');
+    await prefs.remove('pending_onboarding_style');
+    if (!mounted) return;
+    Get.offAllNamed(AppRoutes.main);
   }
 
   @override

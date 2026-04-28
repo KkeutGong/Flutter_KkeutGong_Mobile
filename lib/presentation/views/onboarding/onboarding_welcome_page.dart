@@ -101,18 +101,23 @@ class OnboardingWelcomePage extends StatelessWidget {
                 // M6: 로그인 하기는 의도적으로 LoginPage로 이동합니다.
                 // 계속하기(신규 가입) → OnboardingContainerPage(자격증/시간 선택)
                 // 로그인 하기(기존 계정) → LoginPage(소셜 로그인)
-                CustomTextButton(
-                  text: '로그인 하기',
-                  theme: CustomTextButtonTheme.grayscale,
-                  size: TextButtonSize.large,
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const LoginPage(),
-                      ),
-                    );
-                  },
+                Semantics(
+                  button: true,
+                  identifier: 'onboarding-welcome-login',
+                  label: '로그인 하기',
+                  child: CustomTextButton(
+                    text: '로그인 하기',
+                    theme: CustomTextButtonTheme.grayscale,
+                    size: TextButtonSize.large,
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const LoginPage(),
+                        ),
+                      );
+                    },
+                  ),
                 ),
                 SizedBox(height: 16 * heightRatio),
               ],

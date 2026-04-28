@@ -102,32 +102,37 @@ class _OnboardingCertificateSelectPageState
                     final isSelected = _selectedId == cert['id'];
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 10),
-                      child: GestureDetector(
-                        onTap: () => setState(() => _selectedId = cert['id']),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 20, vertical: 16),
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? colors.primaryLight
-                                : colors.gray0,
-                            border: Border.all(
+                      child: Semantics(
+                        button: true,
+                        identifier: 'onboarding-cert-${cert['id']}',
+                        label: cert['name'],
+                        child: GestureDetector(
+                          onTap: () => setState(() => _selectedId = cert['id']),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 20, vertical: 16),
+                            decoration: BoxDecoration(
                               color: isSelected
-                                  ? colors.primaryNormal
-                                  : colors.gray900,
-                            ),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            children: [
-                              _iconFor(cert['icon']!, colors),
-                              const SizedBox(width: 8),
-                              Text(
-                                cert['name']!,
-                                style: Typo.bodyRegular(context,
-                                    color: colors.gray900),
+                                  ? colors.primaryLight
+                                  : colors.gray0,
+                              border: Border.all(
+                                color: isSelected
+                                    ? colors.primaryNormal
+                                    : colors.gray900,
                               ),
-                            ],
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              children: [
+                                _iconFor(cert['icon']!, colors),
+                                const SizedBox(width: 8),
+                                Text(
+                                  cert['name']!,
+                                  style: Typo.bodyRegular(context,
+                                      color: colors.gray900),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
