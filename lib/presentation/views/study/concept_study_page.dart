@@ -3,6 +3,7 @@ import 'package:kkeutgong_mobile/data/repositories/home/home_repository.dart';
 import 'package:kkeutgong_mobile/domain/models/study/study_card.dart';
 import 'package:kkeutgong_mobile/gen/assets.gen.dart';
 import 'package:kkeutgong_mobile/presentation/viewmodels/study/concept_study_viewmodel.dart';
+import 'package:kkeutgong_mobile/presentation/widgets/common/empty_state.dart';
 import 'package:kkeutgong_mobile/shared/styles/colors.dart';
 import 'package:kkeutgong_mobile/shared/styles/typography.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -109,6 +110,26 @@ class _ConceptStudyPageState extends State<ConceptStudyPage> {
       return Scaffold(
         backgroundColor: colors.gray20,
         body: Center(child: Text('Error: ${_viewModel.error}')),
+      );
+    }
+
+    // No real content for this subject yet — content pipeline hasn't uploaded
+    // it. The previous behaviour (an empty PageView) looked like a frozen
+    // skeleton; this surfaces the cause clearly so the user doesn't think
+    // the app is broken.
+    if (_viewModel.cards.isEmpty) {
+      return Scaffold(
+        backgroundColor: colors.gray20,
+        appBar: AppBar(
+          backgroundColor: colors.gray0,
+          elevation: 0,
+          title: Text(widget.subjectName,
+              style: Typo.titleStrong(context, color: colors.gray900)),
+        ),
+        body: const EmptyState(
+          icon: Icons.menu_book_outlined,
+          message: '아직 이 과목 개념 카드가 준비되지 않았어요.\n곧 채워서 알려드릴게요!',
+        ),
       );
     }
 

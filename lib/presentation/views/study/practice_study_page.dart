@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:kkeutgong_mobile/data/repositories/home/home_repository.dart';
 import 'package:kkeutgong_mobile/domain/models/study/question.dart';
 import 'package:kkeutgong_mobile/presentation/viewmodels/study/practice_study_viewmodel.dart';
+import 'package:kkeutgong_mobile/presentation/widgets/common/empty_state.dart';
 import 'package:kkeutgong_mobile/shared/styles/colors.dart';
 import 'package:kkeutgong_mobile/shared/styles/typography.dart';
 import 'package:kkeutgong_mobile/gen/assets.gen.dart';
@@ -74,13 +75,22 @@ class _PracticeStudyPageState extends State<PracticeStudyPage> {
     }
     final q = _viewModel.currentQuestion;
     if (q == null) {
+      // questions list is empty (content not uploaded yet) → friendly empty
+      // state. The 'index OOB' case is an internal bug we'd rather surface as
+      // the same screen than crash mid-study.
       return Scaffold(
         backgroundColor: colors.gray20,
-        body: Center(
-          child: Text(
-            '문제를 불러올 수 없습니다',
-            style: Typo.bodyRegular(context, color: colors.gray900),
+        appBar: AppBar(
+          backgroundColor: colors.gray0,
+          elevation: 0,
+          title: Text(
+            widget.subjectName,
+            style: Typo.titleStrong(context, color: colors.gray900),
           ),
+        ),
+        body: const EmptyState(
+          icon: Icons.quiz_outlined,
+          message: '아직 이 과목 문제가 준비되지 않았어요.\n곧 기출문제를 채워서 알려드릴게요!',
         ),
       );
     }

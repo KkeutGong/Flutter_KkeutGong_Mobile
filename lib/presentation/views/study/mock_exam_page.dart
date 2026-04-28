@@ -5,6 +5,7 @@ import 'package:kkeutgong_mobile/domain/models/study/exam_result.dart';
 import 'package:kkeutgong_mobile/gen/assets.gen.dart';
 import 'package:kkeutgong_mobile/presentation/viewmodels/study/mock_exam_viewmodel.dart';
 import 'package:kkeutgong_mobile/presentation/widgets/common/custom_button.dart';
+import 'package:kkeutgong_mobile/presentation/widgets/common/empty_state.dart';
 import 'package:kkeutgong_mobile/shared/styles/colors.dart';
 import 'package:kkeutgong_mobile/shared/styles/typography.dart';
 
@@ -121,6 +122,31 @@ class _MockExamPageState extends State<MockExamPage> {
       return Scaffold(
         backgroundColor: colors.gray20,
         body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    // No questions to take an exam with — surface this clearly instead of
+    // dropping the user into a blurred startscreen with nothing under it.
+    if (_viewModel.questions.isEmpty) {
+      return Scaffold(
+        backgroundColor: colors.gray20,
+        appBar: AppBar(
+          backgroundColor: colors.gray0,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+          title: Text(
+            widget.examName,
+            style: Typo.titleStrong(context, color: colors.gray900),
+          ),
+        ),
+        body: const EmptyState(
+          icon: Icons.assignment_outlined,
+          message:
+              '아직 모의고사를 풀 수 있는 문제가 부족해요.\n곧 기출문제를 채워서 시험을 열어드릴게요!',
+        ),
       );
     }
 

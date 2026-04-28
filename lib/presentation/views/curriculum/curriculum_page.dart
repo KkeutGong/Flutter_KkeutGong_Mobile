@@ -8,6 +8,7 @@ import 'package:kkeutgong_mobile/domain/models/home/subject.dart';
 import 'package:kkeutgong_mobile/gen/assets.gen.dart';
 import 'package:kkeutgong_mobile/presentation/viewmodels/curriculum_viewmodel.dart';
 import 'package:kkeutgong_mobile/presentation/views/curriculum/curriculum_page_skeleton.dart';
+import 'package:kkeutgong_mobile/presentation/views/curriculum/exam_date_change_sheet.dart';
 import 'package:kkeutgong_mobile/presentation/widgets/common/custom_button.dart';
 import 'package:kkeutgong_mobile/shared/styles/colors.dart';
 import 'package:kkeutgong_mobile/shared/styles/typography.dart';
@@ -231,12 +232,44 @@ class _CurriculumPageState extends State<CurriculumPage> {
                       data.currentCertificate.name,
                       style: Typo.titleStrong(context, color: colors.gray900),
                     ),
-                    Text(
-                      dDayLabel,
-                      style: Typo.labelStrong(
-                        context,
-                        color: colors.primaryNormal,
-                      ),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Text(
+                          dDayLabel,
+                          style: Typo.labelStrong(
+                            context,
+                            color: colors.primaryNormal,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Semantics(
+                          button: true,
+                          identifier: 'curriculum-change-exam-date',
+                          label: '시험일 변경',
+                          child: GestureDetector(
+                            onTap: () => _onChangeExamDate(data.currentCertificate.id),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: colors.gray70,
+                                borderRadius: BorderRadius.circular(99),
+                              ),
+                              child: Text(
+                                '변경',
+                                style: TextStyle(
+                                  fontFamily: 'Pretendard',
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: colors.gray500,
+                                  letterSpacing: -0.2,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -299,6 +332,8 @@ class _CurriculumPageState extends State<CurriculumPage> {
     }
     final today = DateTime.now();
     final dateLabel = '${today.month}월 ${today.day}일';
+    final progress = _viewModel.todayProgress;
+    final percent = (progress * 100).round();
 
     return Padding(
       padding: EdgeInsets.fromLTRB(horizontalPadding, 16 * scale, horizontalPadding, 0),
@@ -309,35 +344,61 @@ class _CurriculumPageState extends State<CurriculumPage> {
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: colors.primaryNormal.withValues(alpha: 0.25)),
         ),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: colors.primaryNormal,
-                borderRadius: BorderRadius.circular(99),
-              ),
-              child: Text(
-                '오늘의 학습',
-                style: TextStyle(
-                  fontFamily: 'Pretendard',
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: colors.gray0,
-                  letterSpacing: -0.2,
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: colors.primaryNormal,
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                  child: Text(
+                    '오늘의 학습',
+                    style: TextStyle(
+                      fontFamily: 'Pretendard',
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: colors.gray0,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
                 ),
-              ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    _todayTasksLabel(counts.conceptCount, counts.practiceCount),
+                    style: Typo.bodyRegular(context, color: colors.gray900),
+                  ),
+                ),
+                Text(
+                  dateLabel,
+                  style: Typo.labelRegular(context, color: colors.gray500),
+                ),
+              ],
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                _todayTasksLabel(counts.conceptCount, counts.practiceCount),
-                style: Typo.bodyRegular(context, color: colors.gray900),
-              ),
-            ),
-            Text(
-              dateLabel,
-              style: Typo.labelRegular(context, color: colors.gray500),
+            SizedBox(height: 10 * scale),
+            Row(
+              children: [
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(99),
+                    child: LinearProgressIndicator(
+                      value: progress,
+                      minHeight: 6,
+                      backgroundColor: colors.gray70,
+                      valueColor: AlwaysStoppedAnimation(colors.primaryNormal),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  '$percent%',
+                  style: Typo.labelStrong(context, color: colors.primaryNormal),
+                ),
+              ],
             ),
           ],
         ),
@@ -542,6 +603,19 @@ class _CurriculumPageState extends State<CurriculumPage> {
         break;
     }
     await _viewModel.refresh();
+  }
+
+  Future<void> _onChangeExamDate(String certificateId) async {
+    final ok = await ExamDateChangeSheet.show(
+      context: context,
+      certificateId: certificateId,
+      currentCurriculum: _viewModel.myCurriculum,
+    );
+    if (ok == true) {
+      // Refresh draws the new D-day, plan, and today's-progress numbers in
+      // one pass instead of relying on a stale cache.
+      await _viewModel.refresh();
+    }
   }
 
   Future<void> _navigateToMockExam(String certificateName) async {

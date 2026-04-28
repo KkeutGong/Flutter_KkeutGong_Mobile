@@ -200,4 +200,29 @@ class CurriculumViewModel extends ChangeNotifier {
     }
     return (conceptCount: concept, practiceCount: practice);
   }
+
+  /// 0..1 — what fraction of today's plan the user has covered. Averages each
+  /// task's subject-level concept/practice progress; null subjects contribute
+  /// 0 so a partly-mismatched plan still nudges the user forward.
+  double get todayProgress {
+    final day = todayPlan;
+    final data = _homeData;
+    if (day == null || data == null || day.tasks.isEmpty) return 0;
+    final idToName = {for (final s in data.subjects) s.id: s.name};
+    double sum = 0;
+    int count = 0;
+    for (final t in day.tasks) {
+      final name = idToName[t.subjectId];
+      if (name == null) continue;
+      double pct = 0;
+      if (t.type == 'concept') {
+        pct = _conceptPercentBySubject[name] ?? 0;
+      } else if (t.type == 'practice') {
+        pct = _practicePercentBySubject[name] ?? 0;
+      }
+      sum += pct.clamp(0.0, 1.0);
+      count++;
+    }
+    return count == 0 ? 0 : (sum / count).clamp(0.0, 1.0);
+  }
 }
