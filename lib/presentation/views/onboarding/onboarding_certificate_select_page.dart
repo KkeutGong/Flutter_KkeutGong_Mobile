@@ -79,10 +79,17 @@ class _OnboardingCertificateSelectPageState
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '어떤 자격증을 준비중인지 알려주세요',
-                    style: Typo.headingStrong(context, color: colors.gray900),
+                    '어떤 자격증을\n준비중인지 알려주세요',
+                    style: TextStyle(
+                      fontFamily: 'SeoulAlrim',
+                      fontSize: 26,
+                      fontWeight: FontWeight.w800,
+                      height: 1.35,
+                      letterSpacing: -0.6,
+                      color: colors.gray900,
+                    ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 6),
                   Row(
                     children: [
                       Assets.icons.infoFill.svg(
@@ -118,9 +125,20 @@ class _OnboardingCertificateSelectPageState
                               border: Border.all(
                                 color: isSelected
                                     ? colors.primaryNormal
-                                    : colors.gray900,
+                                    : colors.gray30,
+                                width: isSelected ? 1.5 : 1,
                               ),
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(14),
+                              boxShadow: isSelected
+                                  ? [
+                                      BoxShadow(
+                                        color: colors.primaryNormal
+                                            .withValues(alpha: 0.10),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 3),
+                                      ),
+                                    ]
+                                  : [],
                             ),
                             child: Row(
                               children: [

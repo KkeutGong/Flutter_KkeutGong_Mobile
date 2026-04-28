@@ -257,7 +257,7 @@ class _ReportPageState extends State<ReportPage> {
               const SizedBox(width: 12),
               _buildStatChip(context, colors, '맞은 문제', '${result.correctCount}/${result.totalQuestions}'),
               const SizedBox(width: 12),
-              _buildStatChip(context, colors, '소요 시간', '${minutes}분 ${seconds}초'),
+              _buildStatChip(context, colors, '소요 시간', '$minutes분 $seconds초'),
             ],
           ),
         ],

@@ -121,11 +121,13 @@ class _ConceptStudyPageState extends State<ConceptStudyPage> {
       appBar: _buildAppBar(context, colors, responsive),
       body: Stack(
         children: [
-          WillPopScope(
-        onWillPop: () async {
-          await _viewModel.saveProgress();
-          HomeRepository().invalidateCache();
-          return true;
+          PopScope(
+        canPop: true,
+        onPopInvokedWithResult: (didPop, result) async {
+          if (didPop) {
+            await _viewModel.saveProgress();
+            HomeRepository().invalidateCache();
+          }
         },
         child: AnimatedOpacity(
           opacity: _isRoundTransition ? 0.0 : 1.0,
@@ -325,7 +327,7 @@ class _ConceptStudyPageState extends State<ConceptStudyPage> {
           color: colors.gray0,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               offset: const Offset(0, 4),
               blurRadius: 4,
             ),
@@ -343,7 +345,7 @@ class _ConceptStudyPageState extends State<ConceptStudyPage> {
             onTap: () async {
               await _viewModel.saveProgress();
               HomeRepository().invalidateCache();
-              Navigator.of(context).pop();
+              if (context.mounted) Navigator.of(context).pop();
             },
             child: Padding(
               padding: EdgeInsets.all(15 * responsive.scaleFactor),

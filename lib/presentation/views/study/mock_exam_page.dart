@@ -89,7 +89,7 @@ class _MockExamPageState extends State<MockExamPage> {
   void _showSubmitConfirmation() {
     showDialog(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.5),
+      barrierColor: Colors.black.withValues(alpha: 0.5),
       builder: (context) => _SubmitConfirmationDialog(
         unansweredCount: _viewModel.unansweredCount,
         onSubmit: () {
@@ -102,7 +102,7 @@ class _MockExamPageState extends State<MockExamPage> {
   void _showAllQuestions() {
     showDialog(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.5),
+      barrierColor: Colors.black.withValues(alpha: 0.5),
       builder: (context) => _AllQuestionsModal(
         questions: _viewModel.questions,
         currentIndex: _viewModel.currentIndex,
@@ -227,7 +227,7 @@ class _StartScreen extends StatelessWidget {
                   border: Border.all(color: colors.gray70),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.25),
+                      color: Colors.black.withValues(alpha: 0.25),
                       offset: const Offset(0, 4),
                       blurRadius: 4,
                     ),
@@ -264,17 +264,22 @@ class _StartScreen extends StatelessWidget {
                     Align(
                       alignment: Alignment.center,
                       child: Text(
-                        '제한 시간: ${timeLimitMinutes}분',
+                        '제한 시간: $timeLimitMinutes분',
                         style: Typo.bodyStrong(context, color: colors.gray900),
                       ),
                     ),
                     SizedBox(height: 24 * responsive.scaleFactor),
                     Center(
-                      child: CustomButton(
+                      child: Semantics(
+                        identifier: 'mock-exam-start',
+                        label: '모의고사 시작',
+                        button: true,
+                        child: CustomButton(
                         text: '시험 응시하기',
                         size: ButtonSize.medium,
                         theme: CustomButtonTheme.grayscale,
                         onPressed: onStart,
+                        ),
                       ),
                     ),
                   ],
@@ -299,7 +304,11 @@ class _StartScreen extends StatelessWidget {
           backgroundColor: colors.gray0,
           elevation: 0,
           scrolledUnderElevation: 0,
-          leading: GestureDetector(
+          leading: Semantics(
+            identifier: 'mock-exam-back-ready',
+            label: '뒤로 가기',
+            button: true,
+            child: GestureDetector(
             onTap: onClose,
             child: Padding(
               padding: EdgeInsets.all(15 * responsive.scaleFactor),
@@ -309,6 +318,7 @@ class _StartScreen extends StatelessWidget {
                 colorFilter: ColorFilter.mode(colors.gray900, BlendMode.srcIn),
               ),
             ),
+          ),
           ),
           title: Row(
             children: [
@@ -354,7 +364,7 @@ class _StartScreen extends StatelessWidget {
         color: colors.gray0,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             offset: const Offset(0, 4),
             blurRadius: 4,
           ),
@@ -572,7 +582,11 @@ class _ExamPage extends StatelessWidget {
           backgroundColor: colors.gray0,
           elevation: 0,
           scrolledUnderElevation: 0,
-          leading: GestureDetector(
+          leading: Semantics(
+            identifier: 'mock-exam-back-progress',
+            label: '뒤로 가기',
+            button: true,
+            child: GestureDetector(
             onTap: onClose,
             child: Padding(
               padding: EdgeInsets.all(15 * responsive.scaleFactor),
@@ -582,6 +596,7 @@ class _ExamPage extends StatelessWidget {
                 colorFilter: ColorFilter.mode(colors.gray900, BlendMode.srcIn),
               ),
             ),
+          ),
           ),
           title: Row(
             children: [
@@ -627,7 +642,7 @@ class _ExamPage extends StatelessWidget {
         color: colors.gray0,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             offset: const Offset(0, 4),
             blurRadius: 4,
           ),
@@ -643,11 +658,16 @@ class _ExamPage extends StatelessWidget {
             style: Typo.bodyRegular(context, color: colors.redNormal),
           ),
           if (!allAnswered) ...[
-            CustomButton(
+            Semantics(
+              identifier: 'mock-exam-submit',
+              label: '제출하기',
+              button: true,
+              child: CustomButton(
               text: '제출',
               size: ButtonSize.small,
               theme: CustomButtonTheme.grayscale,
               onPressed: onSubmit,
+              ),
             ),
           ],
         ],
@@ -688,7 +708,11 @@ class _ExamPage extends StatelessWidget {
         final isSelected = question.selectedAnswer == choice.number;
         return Padding(
           padding: EdgeInsets.only(bottom: 10 * responsive.scaleFactor),
-          child: GestureDetector(
+          child: Semantics(
+            identifier: 'mock-exam-choice-${choice.number}',
+            label: '${choice.number}번 보기 선택',
+            button: true,
+            child: GestureDetector(
             onTap: () => onSelectAnswer(choice.number),
             child: Container(
               width: double.infinity,
@@ -742,6 +766,7 @@ class _ExamPage extends StatelessWidget {
               ),
             ),
           ),
+          ),
         );
       }).toList(),
     );
@@ -762,22 +787,32 @@ class _ExamPage extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: CustomButton(
+            child: Semantics(
+              identifier: 'mock-exam-previous',
+              label: '이전 문제',
+              button: true,
+              child: CustomButton(
               text: '이전으로',
               size: ButtonSize.large,
               theme: CustomButtonTheme.grayscale,
               disabled: isFirstQuestion,
               onPressed: onPrevious,
+              ),
             ),
           ),
           SizedBox(width: 12 * responsive.scaleFactor),
           Expanded(
-            child: CustomButton(
+            child: Semantics(
+              identifier: 'mock-exam-next-or-submit',
+              label: (allAnswered && isLastQuestion) ? '제출하기' : '다음 문제',
+              button: true,
+              child: CustomButton(
               text: buttonText,
               size: ButtonSize.large,
               theme: CustomButtonTheme.grayscale,
               disabled: !hasAnswer,
               onPressed: (allAnswered && isLastQuestion) ? onSubmit : onNext,
+              ),
             ),
           ),
         ],
@@ -839,7 +874,11 @@ class _SubmitConfirmationDialog extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                  child: GestureDetector(
+                  child: Semantics(
+                    identifier: 'mock-exam-cancel',
+                    label: '취소',
+                    button: true,
+                    child: GestureDetector(
                     onTap: () => Navigator.of(context).pop(),
                     child: Container(
                       padding: EdgeInsets.symmetric(vertical: 16 * responsive.scaleFactor),
@@ -854,11 +893,16 @@ class _SubmitConfirmationDialog extends StatelessWidget {
                         style: Typo.bodyRegular(context, color: colors.gray900),
                       ),
                     ),
+                    ),
                   ),
                 ),
                 SizedBox(width: 12 * responsive.scaleFactor),
                 Expanded(
-                  child: GestureDetector(
+                  child: Semantics(
+                    identifier: 'mock-exam-confirm',
+                    label: '제출하기',
+                    button: true,
+                    child: GestureDetector(
                     onTap: () {
                       Navigator.of(context).pop();
                       onSubmit();
@@ -874,6 +918,7 @@ class _SubmitConfirmationDialog extends StatelessWidget {
                         '제출하기',
                         style: Typo.bodyRegular(context, color: colors.gray0),
                       ),
+                    ),
                     ),
                   ),
                 ),
@@ -916,7 +961,7 @@ class _AllQuestionsModal extends StatelessWidget {
             border: Border.all(color: colors.gray300),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.25),
+                color: Colors.black.withValues(alpha: 0.25),
                 offset: const Offset(0, 4),
                 blurRadius: 4,
               ),
@@ -945,7 +990,11 @@ class _AllQuestionsModal extends StatelessWidget {
                       ],
                     ),
                   ),
-                  GestureDetector(
+                  Semantics(
+                    identifier: 'mock-exam-dialog-close',
+                    label: '닫기',
+                    button: true,
+                    child: GestureDetector(
                     onTap: () => Navigator.of(context).pop(),
                     child: Assets.icons.close.svg(
                       width: responsive.largeIconSize,
@@ -954,6 +1003,7 @@ class _AllQuestionsModal extends StatelessWidget {
                         colors.gray900,
                         BlendMode.srcIn,
                       ),
+                    ),
                     ),
                   ),
                 ],
@@ -988,7 +1038,11 @@ class _AllQuestionsModal extends StatelessWidget {
         }
 
         rowItems.add(
-          GestureDetector(
+          Semantics(
+            identifier: 'mock-exam-jump-$j',
+            label: '${j + 1}번 문제로 이동',
+            button: true,
+            child: GestureDetector(
             onTap: () => onSelect(j),
             child: Container(
               width: responsive.questionCircleSize,
@@ -1005,9 +1059,10 @@ class _AllQuestionsModal extends StatelessWidget {
               ),
             ),
           ),
+          ),
         );
       }
-      
+
       rows.add(
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1250,7 +1305,11 @@ class _ResultPageState extends State<_ResultPage> {
                 ),
                 Row(
                   children: [
-                    GestureDetector(
+                    Semantics(
+                      identifier: 'mock-exam-result-previous',
+                      label: '이전 문제 보기',
+                      button: true,
+                      child: GestureDetector(
                       onTap: widget.currentIndex > 0 ? widget.onPrevious : null,
                       child: Opacity(
                         opacity: widget.currentIndex > 0 ? 1.0 : 0.3,
@@ -1263,6 +1322,7 @@ class _ResultPageState extends State<_ResultPage> {
                           ),
                         ),
                       ),
+                      ),
                     ),
                     SizedBox(width: 8 * responsive.scaleFactor),
                     Text(
@@ -1270,7 +1330,11 @@ class _ResultPageState extends State<_ResultPage> {
                       style: Typo.titleStrong(context, color: colors.gray900),
                     ),
                     SizedBox(width: 8 * responsive.scaleFactor),
-                    GestureDetector(
+                    Semantics(
+                      identifier: 'mock-exam-result-next',
+                      label: '다음 문제 보기',
+                      button: true,
+                      child: GestureDetector(
                       onTap: widget.currentIndex < widget.questions.length - 1
                           ? widget.onNext
                           : null,
@@ -1289,6 +1353,7 @@ class _ResultPageState extends State<_ResultPage> {
                         ),
                       ),
                     ),
+                    ),
                   ],
                 ),
               ],
@@ -1298,11 +1363,16 @@ class _ResultPageState extends State<_ResultPage> {
         SizedBox(height: 10 * responsive.scaleFactor),
         Align(
           alignment: Alignment.centerRight,
-          child: CustomButton(
+          child: Semantics(
+            identifier: 'mock-exam-view-all',
+            label: '전체 문제 보기',
+            button: true,
+            child: CustomButton(
             text: '전체보기',
             size: ButtonSize.small,
             theme: CustomButtonTheme.grayscale,
             onPressed: widget.onViewAllQuestions,
+            ),
           ),
         ),
         SizedBox(height: 12 * responsive.scaleFactor),
@@ -1501,7 +1571,11 @@ class _ResultPageState extends State<_ResultPage> {
                       if (!_showExplanation)
                         Positioned.fill(
                           child: Center(
-                            child: CustomButton(
+                            child: Semantics(
+                              identifier: 'mock-exam-show-explanation',
+                              label: '해설 보기',
+                              button: true,
+                              child: CustomButton(
                               text: '해설보기',
                               size: ButtonSize.small,
                               theme: CustomButtonTheme.primary,
@@ -1511,6 +1585,7 @@ class _ResultPageState extends State<_ResultPage> {
                                   _showExplanation = true;
                                 });
                               },
+                              ),
                             ),
                           ),
                         ),
@@ -1581,11 +1656,16 @@ class _ResultPageState extends State<_ResultPage> {
     return Container(
       width: double.infinity,
       padding: EdgeInsets.symmetric(horizontal: responsive.horizontalPadding + 3, vertical: 16 * responsive.scaleFactor),
-      child: CustomButton(
+      child: Semantics(
+        identifier: 'mock-exam-complete',
+        label: '완료',
+        button: true,
+        child: CustomButton(
         text: '완료하기',
         size: ButtonSize.large,
         theme: CustomButtonTheme.grayscale,
         onPressed: widget.onComplete,
+        ),
       ),
     );
   }

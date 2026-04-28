@@ -89,11 +89,13 @@ class _PracticeStudyPageState extends State<PracticeStudyPage> {
       backgroundColor: colors.gray20,
       appBar: _buildAppBar(context, colors, responsive),
       body: SafeArea(
-          child: WillPopScope(
-          onWillPop: () async {
-            await _viewModel.saveProgress();
-            HomeRepository().invalidateCache();
-            return true;
+          child: PopScope(
+          canPop: true,
+          onPopInvokedWithResult: (didPop, result) async {
+            if (didPop) {
+              await _viewModel.saveProgress();
+              HomeRepository().invalidateCache();
+            }
           },
           child: Stack(
             children: [
@@ -133,7 +135,7 @@ class _PracticeStudyPageState extends State<PracticeStudyPage> {
           color: colors.gray0,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               offset: const Offset(0, 4),
               blurRadius: 4,
             ),
@@ -143,11 +145,15 @@ class _PracticeStudyPageState extends State<PracticeStudyPage> {
           backgroundColor: colors.gray0,
           elevation: 0,
           scrolledUnderElevation: 0,
-          leading: GestureDetector(
+          leading: Semantics(
+            identifier: 'practice-back',
+            label: '뒤로 가기',
+            button: true,
+            child: GestureDetector(
             onTap: () async {
               await _viewModel.saveProgress();
               HomeRepository().invalidateCache();
-              Navigator.of(context).pop();
+              if (context.mounted) Navigator.of(context).pop();
             },
             child: Padding(
               padding: EdgeInsets.all(15 * responsive.scaleFactor),
@@ -157,6 +163,7 @@ class _PracticeStudyPageState extends State<PracticeStudyPage> {
                 colorFilter: ColorFilter.mode(colors.gray900, BlendMode.srcIn),
               ),
             ),
+          ),
           ),
           title: Row(
             children: [
@@ -256,7 +263,11 @@ class _PracticeStudyPageState extends State<PracticeStudyPage> {
         numBg = colors.redLightActive;
       }
     }
-    return GestureDetector(
+    return Semantics(
+      identifier: 'practice-choice-${choice.number}',
+      label: '${choice.number}번 보기 선택',
+      button: true,
+      child: GestureDetector(
       onTap: hasAnswered ? null : () => _viewModel.selectAnswer(choice.number),
       child: Container(
         width: double.infinity,
@@ -336,6 +347,7 @@ class _PracticeStudyPageState extends State<PracticeStudyPage> {
           ],
         ),
       ),
+      ),
     );
   }
 
@@ -382,7 +394,11 @@ class _PracticeStudyPageState extends State<PracticeStudyPage> {
               if (!_viewModel.showExplanation)
                 Positioned.fill(
                   child: Center(
-                    child: GestureDetector(
+                    child: Semantics(
+                      identifier: 'practice-explanation-toggle',
+                      label: '해설 보기',
+                      button: true,
+                      child: GestureDetector(
                       onTap: _viewModel.toggleExplanation,
                       child: Container(
                         padding: EdgeInsets.symmetric(
@@ -417,6 +433,7 @@ class _PracticeStudyPageState extends State<PracticeStudyPage> {
                         ),
                       ),
                     ),
+                    ),
                   ),
                 ),
             ],
@@ -433,7 +450,11 @@ class _PracticeStudyPageState extends State<PracticeStudyPage> {
       padding: EdgeInsets.fromLTRB(responsive.buttonPaddingH, 12 * responsive.scaleFactor, responsive.buttonPaddingH, 20 * responsive.scaleFactor),
       child: SizedBox(
         width: double.infinity,
-        child: GestureDetector(
+        child: Semantics(
+          identifier: 'practice-next',
+          label: '다음 문제',
+          button: true,
+          child: GestureDetector(
           onTap: enabled
               ? () {
                   if (last) {
@@ -458,6 +479,7 @@ class _PracticeStudyPageState extends State<PracticeStudyPage> {
               ),
             ),
           ),
+        ),
         ),
       ),
     );

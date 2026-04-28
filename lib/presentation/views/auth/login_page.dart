@@ -9,7 +9,6 @@ import 'package:kkeutgong_mobile/data/repositories/auth/auth_repository.dart';
 import 'package:kkeutgong_mobile/gen/assets.gen.dart';
 import 'package:kkeutgong_mobile/presentation/widgets/common/custom_button.dart';
 import 'package:kkeutgong_mobile/shared/styles/colors.dart';
-import 'package:kkeutgong_mobile/shared/styles/typography.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class LoginPage extends StatefulWidget {
@@ -158,14 +157,63 @@ class _LoginPageState extends State<LoginPage> {
               Column(
                 children: [
                   Text(
-                    '끝공으로 합격한 합격자 수',
+                    '끝공',
                     textAlign: TextAlign.center,
-                    style: Typo.bodyRegular(context).copyWith(color: colors.gray900),
+                    style: TextStyle(
+                      fontFamily: 'SeoulAlrim',
+                      fontSize: 48,
+                      fontWeight: FontWeight.w800,
+                      height: 1.2,
+                      letterSpacing: -1.4,
+                      color: colors.primaryNormal,
+                    ),
                   ),
+                  const SizedBox(height: 12),
                   Text(
-                    '102,870,965',
+                    '포기하지 않는 경험을 만듭니다.',
                     textAlign: TextAlign.center,
-                    style: Typo.displayStrong(context),
+                    style: TextStyle(
+                      fontFamily: 'SeoulAlrim',
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      height: 1.4,
+                      letterSpacing: -0.4,
+                      color: colors.gray500,
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: colors.primaryLight,
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '합격자 수',
+                          style: TextStyle(
+                            fontFamily: 'Pretendard',
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: colors.primaryDark,
+                            letterSpacing: -0.2,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '102,870,965',
+                          style: TextStyle(
+                            fontFamily: 'SeoulAlrim',
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.4,
+                            color: colors.primaryNormal,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),

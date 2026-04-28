@@ -27,15 +27,20 @@ class OnboardingLoadingPage extends StatelessWidget {
                 children: [
                   Text(
                     '거의 다 왔어요!',
-                    style: Typo.headingStrong(context).copyWith(
+                    style: TextStyle(
+                      fontFamily: 'SeoulAlrim',
+                      fontSize: 32,
+                      fontWeight: FontWeight.w800,
+                      height: 1.3,
+                      letterSpacing: -0.8,
                       color: colors.gray900,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
                   Text(
                     '로그인하면 AI가 맞춤 커리큘럼을\n바로 만들어 드릴게요.',
                     style: Typo.bodyRegular(context).copyWith(
-                      color: colors.gray600,
+                      color: colors.gray500,
                     ),
                   ),
                   const SizedBox(height: 32),
