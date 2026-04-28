@@ -529,10 +529,20 @@ class _FlashCardState extends State<_FlashCard> {
             child: Center(
               child: Padding(
                 padding: EdgeInsets.symmetric(horizontal: 32 * responsive.scaleFactor),
-                child: Text(
-                  widget.card.question,
-                  style: Typo.titleRegular(context, color: colors.gray900),
-                  textAlign: TextAlign.center,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (widget.card.sourceLabel != null &&
+                        widget.card.sourceLabel!.isNotEmpty) ...[
+                      _buildSourceBadge(context, colors, widget.card.sourceLabel!),
+                      SizedBox(height: 12 * responsive.scaleFactor),
+                    ],
+                    Text(
+                      widget.card.question,
+                      style: Typo.titleRegular(context, color: colors.gray900),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -725,6 +735,27 @@ class _FlashCardState extends State<_FlashCard> {
             ],
           ),
         ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSourceBadge(BuildContext context, ThemeColors colors, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: colors.primaryLight,
+        borderRadius: BorderRadius.circular(99),
+        border: Border.all(color: colors.primaryNormal.withValues(alpha: 0.4)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontFamily: 'Pretendard',
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: colors.primaryNormal,
+          letterSpacing: -0.2,
         ),
       ),
     );

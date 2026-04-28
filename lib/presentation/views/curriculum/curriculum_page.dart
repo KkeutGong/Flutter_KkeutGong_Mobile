@@ -545,11 +545,13 @@ class _CurriculumPageState extends State<CurriculumPage> {
   }
 
   Future<void> _navigateToMockExam(String certificateName) async {
+    final minutes =
+        _viewModel.homeData?.currentCertificate.mockExamMinutes ?? 90;
     await Get.toNamed(
       AppRoutes.mockExam,
       arguments: {
         'examName': '$certificateName 모의고사',
-        'timeLimitMinutes': 150,
+        'timeLimitMinutes': minutes,
       },
     );
     await _viewModel.refresh();

@@ -201,19 +201,47 @@ class _PracticeStudyPageState extends State<PracticeStudyPage> {
   }
 
   Widget _buildTitle(BuildContext context, ThemeColors colors, Question q, _ResponsiveHelper responsive) {
-    return Row(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          '${q.number}.',
-          style: Typo.titleStrong(context, color: colors.gray900),
-        ),
-        SizedBox(width: 10 * responsive.scaleFactor),
-        Expanded(
-          child: Text(
-            q.text,
-            style: Typo.headingStrong(context, color: colors.gray900),
+        if (q.sourceLabel != null && q.sourceLabel!.isNotEmpty) ...[
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: colors.primaryLight,
+              borderRadius: BorderRadius.circular(99),
+              border: Border.all(
+                color: colors.primaryNormal.withValues(alpha: 0.4),
+              ),
+            ),
+            child: Text(
+              q.sourceLabel!,
+              style: TextStyle(
+                fontFamily: 'Pretendard',
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: colors.primaryNormal,
+                letterSpacing: -0.2,
+              ),
+            ),
           ),
+          SizedBox(height: 10 * responsive.scaleFactor),
+        ],
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '${q.number}.',
+              style: Typo.titleStrong(context, color: colors.gray900),
+            ),
+            SizedBox(width: 10 * responsive.scaleFactor),
+            Expanded(
+              child: Text(
+                q.text,
+                style: Typo.headingStrong(context, color: colors.gray900),
+              ),
+            ),
+          ],
         ),
       ],
     );

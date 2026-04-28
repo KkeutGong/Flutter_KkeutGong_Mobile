@@ -61,7 +61,13 @@ class _HomePageState extends State<HomePage> {
         nav = Get.toNamed(AppRoutes.practiceStudy, arguments: {'subjectName': subjectName});
         break;
       case StudyMode.review:
-        nav = Get.toNamed(AppRoutes.mockExam, arguments: {'examName': subjectName, 'timeLimitMinutes': 150});
+        // Pull the time limit from the active cert so 컴활 2급(90), 한국사(80) etc.
+        // get their real exam clock instead of a 정보처리기사-shaped 150-min default.
+        final minutes = hd?.currentCertificate.mockExamMinutes ?? 90;
+        nav = Get.toNamed(AppRoutes.mockExam, arguments: {
+          'examName': subjectName,
+          'timeLimitMinutes': minutes,
+        });
         break;
     }
     if (nav != null) {

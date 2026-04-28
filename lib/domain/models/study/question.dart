@@ -22,6 +22,9 @@ class Question {
   final String id;
   final int number;
   final String text;
+  // Free-form attribution (e.g. '한국사 심화 77회 12번'). Null when content was
+  // hand-authored or the source isn't tracked.
+  final String? sourceLabel;
   final List<Choice> choices;
   final String explanation;
   int? selectedAnswer;
@@ -33,6 +36,7 @@ class Question {
     required this.text,
     required this.choices,
     required this.explanation,
+    this.sourceLabel,
     this.selectedAnswer,
     this.isCorrect,
   });
@@ -44,6 +48,7 @@ class Question {
       id: json['id'] as String,
       number: json['number'] as int,
       text: json['text'] as String,
+      sourceLabel: json['sourceLabel'] as String?,
       choices: (json['choices'] as List)
           .map((e) => Choice.fromJson(e as Map<String, dynamic>))
           .toList(),
