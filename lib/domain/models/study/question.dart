@@ -8,6 +8,14 @@ class Choice {
     required this.text,
     this.isCorrect = false,
   });
+
+  factory Choice.fromJson(Map<String, dynamic> json) {
+    return Choice(
+      number: json['number'] as int,
+      text: json['text'] as String,
+      isCorrect: (json['isCorrect'] as bool?) ?? false,
+    );
+  }
 }
 
 class Question {
@@ -30,4 +38,18 @@ class Question {
   });
 
   int get correctAnswer => choices.indexWhere((c) => c.isCorrect) + 1;
+
+  factory Question.fromJson(Map<String, dynamic> json) {
+    return Question(
+      id: json['id'] as String,
+      number: json['number'] as int,
+      text: json['text'] as String,
+      choices: (json['choices'] as List)
+          .map((e) => Choice.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      explanation: (json['explanation'] as String?) ?? '',
+      selectedAnswer: json['selectedAnswer'] as int?,
+      isCorrect: json['isCorrect'] as bool?,
+    );
+  }
 }

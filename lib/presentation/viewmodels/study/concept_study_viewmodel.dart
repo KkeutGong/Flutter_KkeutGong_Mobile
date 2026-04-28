@@ -106,8 +106,17 @@ class ConceptStudyViewModel extends ChangeNotifier {
 
     final card = _currentRoundCards[_currentIndex];
     card.isFavorite = !card.isFavorite;
-    _repository.updateCardFavorite(card.id, card.isFavorite);
     notifyListeners();
+    _persistFavorites();
+  }
+
+  Future<void> _persistFavorites() async {
+    final favoriteIds = _allCards.where((c) => c.isFavorite).map((c) => c.id).toList();
+    await _repository.saveProgress(
+      subjectName: subjectName,
+      knownIds: _knownCardIds.toList(),
+      favoriteIds: favoriteIds,
+    );
   }
 
   void markAsKnown() {

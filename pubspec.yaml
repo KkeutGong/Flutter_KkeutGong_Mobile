@@ -1,7 +1,7 @@
 name: kkeutgong_mobile
-description: "A new Flutter project."
+description: "끝공 - AI 기반 자격증 학습 앱"
 publish_to: 'none'
-version: 0.1.0
+version: 1.0.0+1
 
 environment:
   sdk: ^3.8.1
@@ -9,6 +9,10 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # Core
   json_annotation: ^4.9.0
   flutter_dotenv: ^5.2.1
   flutter_svg: ^2.2.0
@@ -16,6 +20,24 @@ dependencies:
   get: ^4.7.2
   permission_handler: ^12.0.1
   shared_preferences: ^2.3.2
+  http: ^1.2.2
+  intl: ^0.20.0
+
+  # Auth
+  flutter_secure_storage: ^9.2.0
+  kakao_flutter_sdk_user: ^1.9.0
+  google_sign_in: ^6.2.0
+  sign_in_with_apple: ^6.1.0
+
+  # Settings / Info
+  url_launcher: ^6.3.0
+  package_info_plus: ^8.0.0
+
+  # Monitoring
+  sentry_flutter: ^8.10.0
+
+  # Notifications
+  flutter_local_notifications: ^17.0.0
 
 dev_dependencies:
   flutter_test:
@@ -29,8 +51,16 @@ dev_dependencies:
   flutter_launcher_icons: ^0.14.4
   flutter_gen_runner: ^5.11.0
 
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/icons/app_icon.png"
+  remove_alpha_ios: true
+  min_sdk_android: 21
+
 flutter:
   uses-material-design: true
+  generate: true
 
   assets:
     - assets/icons/
@@ -43,6 +73,9 @@ flutter:
           weight: 700
         - asset: assets/fonts/SeoulAlrim-ExtraBold.ttf
           weight: 800
+    - family: TossFace
+      fonts:
+        - asset: assets/fonts/TossFace.ttf
     - family: Pretendard
       fonts:
         - asset: assets/fonts/Pretendard-Thin.ttf
@@ -63,12 +96,6 @@ flutter:
           weight: 800
         - asset: assets/fonts/Pretendard-Black.ttf
           weight: 900
-
-# flutter_icons:
-#   android: true
-#   ios: true
-#   image_path: "assets/icons/app_icon.png"
-#   remove_alpha_ios: true
 
 flutter_gen:
   output: lib/gen/

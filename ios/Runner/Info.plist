@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Kkeutgong Mobile</string>
+	<string>끝공</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -47,5 +47,38 @@
 	<true/>
 	<key>NSUserNotificationsUsageDescription</key>
 	<string>학습 알림을 보내기 위해 알림 권한이 필요합니다.</string>
+
+	<!-- Kakao Login -->
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>kakaokompassauth</string>
+		<string>kakaolink</string>
+		<string>kakaoplus</string>
+	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<!-- Kakao -->
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>kakaoa3d2950a5b2671077fa2f1d26b5f76ac</string>
+			</array>
+		</dict>
+		<!-- Google Sign-In -->
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.549691983884-srbndqgvipkce8mfatt9b3jfvotuqivi</string>
+			</array>
+		</dict>
+	</array>
+
+	<!-- Google Sign-In Client ID (required by google_sign_in 6.x on iOS) -->
+	<key>GIDClientID</key>
+	<string>549691983884-srbndqgvipkce8mfatt9b3jfvotuqivi.apps.googleusercontent.com</string>
 </dict>
 </plist>

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:kkeutgong_mobile/data/repositories/curriculum/curriculum_repository.dart';
 import 'package:kkeutgong_mobile/data/repositories/home/home_repository.dart';
+import 'package:kkeutgong_mobile/domain/models/curriculum/curriculum_plan.dart';
 import 'package:kkeutgong_mobile/domain/models/home/home_data.dart';
 import 'package:kkeutgong_mobile/domain/models/home/study_mode.dart';
 import 'package:kkeutgong_mobile/domain/models/home/subject.dart';
@@ -7,11 +9,13 @@ import 'package:kkeutgong_mobile/data/repositories/study/study_progress_reposito
 
 class CurriculumViewModel extends ChangeNotifier {
   final HomeRepository _repository;
+  final CurriculumRepository _curriculumRepo = CurriculumRepository();
   final StudyProgressRepository _progressRepository = StudyProgressRepository();
 
   CurriculumViewModel(HomeRepository? repository) : _repository = repository ?? HomeRepository();
 
   HomeData? _homeData;
+  MyCurriculum? _myCurriculum;
   bool _isLoading = false;
   bool _isInitialized = false;
   String? _error;
@@ -38,6 +42,18 @@ class CurriculumViewModel extends ChangeNotifier {
         final c = await _progressRepository.getConceptPercent(s.name);
         _practicePercentBySubject[s.name] = p;
         _conceptPercentBySubject[s.name] = c;
+      }
+      // Fetch the daily plan separately. A null/error response just hides the
+      // "오늘의 학습" section — the rest of the page still renders.
+      final certId = _homeData?.currentCertificate.id;
+      if (certId != null) {
+        try {
+          _myCurriculum = await _curriculumRepo.getMyCurriculum(certId);
+        } catch (_) {
+          _myCurriculum = null;
+        }
+      } else {
+        _myCurriculum = null;
       }
       _isLoading = false;
       _isInitialized = true;
@@ -137,12 +153,13 @@ class CurriculumViewModel extends ChangeNotifier {
   }
 
   int get examDDay {
-    final data = _homeData;
-    if (data == null) return 0;
-    const targetDay = 11;
-    final remaining = targetDay - data.currentDay;
-    return remaining > 0 ? remaining : 0;
+    // The backend computes daysRemaining from the user's curriculum.examDate
+    // every request, so the countdown stays accurate even if the device clock
+    // has drifted. Null means the user hasn't generated a curriculum yet.
+    return _homeData?.daysRemaining ?? 0;
   }
+
+  bool get hasExamDate => _homeData?.examDate != null;
 
   double get progress => _homeData?.progress ?? 0;
 
@@ -156,5 +173,31 @@ class CurriculumViewModel extends ChangeNotifier {
     _repository.setCurrentCertificate(certificateId);
     _isInitialized = false;
     load(forceRefresh: true);
+  }
+
+  // ── Today's plan ───────────────────────────────────────────────────────────
+  // Drives the "오늘의 학습" mini-section. Null when:
+  //  - the user hasn't generated a curriculum yet, or
+  //  - today is past the last planned day (ran out of plan).
+
+  MyCurriculum? get myCurriculum => _myCurriculum;
+
+  CurriculumDay? get todayPlan {
+    final c = _myCurriculum;
+    if (c == null) return null;
+    return c.dayFor(DateTime.now());
+  }
+
+  /// Aggregated counts for today, broken down by task type.
+  ({int conceptCount, int practiceCount}) get todayTaskCounts {
+    final day = todayPlan;
+    if (day == null) return (conceptCount: 0, practiceCount: 0);
+    int concept = 0;
+    int practice = 0;
+    for (final t in day.tasks) {
+      if (t.type == 'concept') concept += t.count;
+      if (t.type == 'practice') practice += t.count;
+    }
+    return (conceptCount: concept, practiceCount: practice);
   }
 }

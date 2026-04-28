@@ -1,0 +1,66 @@
+name: flutter-ci
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Flutter_KkeutGong_Mobile/**'
+      - '.github/workflows/**'
+  pull_request:
+    paths:
+      - 'Flutter_KkeutGong_Mobile/**'
+
+jobs:
+  analyze-and-build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.38.3'
+          channel: stable
+          cache: true
+      - name: Provision .env
+        run: |
+          mkdir -p assets/config
+          cat > assets/config/.env <<'EOF'
+          API_BASE_URL=https://example.invalid/api
+          KAKAO_NATIVE_APP_KEY=ci_dummy
+          GOOGLE_CLIENT_ID=
+          SENTRY_DSN=
+          APP_STORE_URL=https://apps.apple.com/app/idXXXXXXXXX
+          PLAY_STORE_URL=https://play.google.com/store/apps/details?id=com.kkeutgong.app
+          EOF
+      - run: flutter pub get
+      - run: flutter gen-l10n
+      - run: flutter analyze --no-fatal-infos --no-fatal-warnings
+      - run: flutter test
+      - run: flutter build ios --no-codesign --debug
+      - run: flutter build apk --debug
+
+  android-bundle:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.38.3'
+          channel: stable
+          cache: true
+      - run: |
+          mkdir -p assets/config
+          echo "API_BASE_URL=${{ secrets.API_BASE_URL }}" > assets/config/.env
+          echo "KAKAO_NATIVE_APP_KEY=${{ secrets.KAKAO_NATIVE_APP_KEY }}" >> assets/config/.env
+          echo "GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}" >> assets/config/.env
+          echo "SENTRY_DSN=${{ secrets.SENTRY_DSN }}" >> assets/config/.env
+          echo "APP_STORE_URL=${{ secrets.APP_STORE_URL }}" >> assets/config/.env
+          echo "PLAY_STORE_URL=${{ secrets.PLAY_STORE_URL }}" >> assets/config/.env
+      - run: flutter pub get
+      - run: flutter gen-l10n
+      - run: flutter build appbundle --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kkeutgong-aab
+          path: build/app/outputs/bundle/release/app-release.aab
+          retention-days: 14

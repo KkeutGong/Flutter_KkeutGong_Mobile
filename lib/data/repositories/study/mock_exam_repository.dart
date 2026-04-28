@@ -1,61 +1,80 @@
-import 'package:kkeutgong_mobile/domain/models/study/question.dart';
+import 'package:kkeutgong_mobile/core/api/api_client.dart';
+import 'package:kkeutgong_mobile/core/session/session.dart';
 import 'package:kkeutgong_mobile/domain/models/study/exam_result.dart';
+import 'package:kkeutgong_mobile/domain/models/study/question.dart';
+
+class MockExamSession {
+  final String examName;
+  final int timeLimitMinutes;
+  final List<Question> questions;
+  const MockExamSession({
+    required this.examName,
+    required this.timeLimitMinutes,
+    required this.questions,
+  });
+}
 
 class MockExamRepository {
   static final MockExamRepository _instance = MockExamRepository._internal();
   factory MockExamRepository() => _instance;
   MockExamRepository._internal();
 
-  final Map<String, List<Question>> _cache = {};
-  final Map<String, DateTime> _cacheTimestamps = {};
-  static const Duration _cacheExpiry = Duration(minutes: 30);
+  final ApiClient _api = ApiClient();
+  final Session _session = Session();
 
-  bool _isCacheValid(String examName) {
-    final timestamp = _cacheTimestamps[examName];
-    if (timestamp == null) return false;
-    return DateTime.now().difference(timestamp) < _cacheExpiry;
+  Future<MockExamSession> startExam({String? examName}) async {
+    final json = await _api.post('/study/mock-exams/start', body: {
+      'certificateId': _session.currentCertificateId,
+      if (examName != null) 'examName': examName,
+    }) as Map<String, dynamic>;
+
+    return MockExamSession(
+      examName: json['examName'] as String,
+      timeLimitMinutes: json['timeLimitMinutes'] as int,
+      questions: (json['questions'] as List)
+          .map((e) => Question.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    );
   }
 
-  Future<List<Question>> getQuestions(String examName, {bool forceRefresh = false}) async {
-    if (!forceRefresh && _cache.containsKey(examName) && _isCacheValid(examName)) {
-      return _cache[examName]!;
-    }
+  Future<ExamResult> submitExam({
+    required String examName,
+    required Map<String, int> answers,
+    required int elapsedSeconds,
+  }) async {
+    final json = await _api.post('/study/mock-exams/submit', body: {
+      'userId': _session.userId,
+      'certificateId': _session.currentCertificateId,
+      'examName': examName,
+      'answers': answers,
+      'elapsedSeconds': elapsedSeconds,
+    }) as Map<String, dynamic>;
 
-    final questions = <Question>[];
-    for (int i = 0; i < 5; i++) {
-      questions.add(Question(
-        id: 'q_$i',
-        number: i + 1,
-        text: '다음 중 옴의 법칙을 올바르게 나타낸 것은?',
-        choices: [
-          Choice(number: 1, text: 'V = IR', isCorrect: true),
-          Choice(number: 2, text: 'V = I/R', isCorrect: false),
-          Choice(number: 3, text: 'V = R/I', isCorrect: false),
-          Choice(number: 4, text: 'I = VR', isCorrect: false),
-        ],
-        explanation: '옴의 법칙에 대한 해설입니다.',
-      ));
-    }
+    final scoresJson = (json['subjectScores'] as Map<String, dynamic>?) ?? const {};
+    final subjectScores = <String, SubjectScore>{};
+    scoresJson.forEach((key, value) {
+      final v = value as Map<String, dynamic>;
+      subjectScores[key] = SubjectScore(
+        name: v['name'] as String,
+        totalQuestions: v['totalQuestions'] as int,
+        correctCount: v['correctCount'] as int,
+      );
+    });
 
-    _cache[examName] = questions;
-    _cacheTimestamps[examName] = DateTime.now();
-
-    return questions;
+    return ExamResult(
+      totalQuestions: json['totalQuestions'] as int,
+      correctCount: json['correctCount'] as int,
+      elapsedTime: Duration(seconds: json['elapsedSeconds'] as int),
+      isPassed: json['isPassed'] as bool,
+      subjectScores: subjectScores,
+    );
   }
 
-  Future<void> saveAnswer(String questionId, int answer) async {
-  }
-
-  Future<void> saveExamResult(ExamResult result) async {
-  }
-
-  void invalidateCache(String examName) {
-    _cache.remove(examName);
-    _cacheTimestamps.remove(examName);
-  }
-
-  void clearAllCache() {
-    _cache.clear();
-    _cacheTimestamps.clear();
+  Future<List<Map<String, dynamic>>> getHistory() async {
+    final list = await _api.get('/study/mock-exams/history', query: {
+      'userId': _session.userId,
+      'certificateId': _session.currentCertificateId,
+    }) as List;
+    return list.cast<Map<String, dynamic>>();
   }
 }

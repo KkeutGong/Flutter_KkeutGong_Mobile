@@ -70,6 +70,7 @@ class _OnboardingHoursPageState extends State<OnboardingHoursPage> {
 
   String get _certificateId => _prevArgs['certificateId'] as String? ?? '1';
   String? get _examDate => _prevArgs['examDate'] as String?;
+  String? get _examSessionId => _prevArgs['examSessionId'] as String?;
 
   bool get _canContinue => _selectedIndex != null;
 
@@ -161,6 +162,7 @@ class _OnboardingHoursPageState extends State<OnboardingHoursPage> {
                         arguments: {
                           'certificateId': _certificateId,
                           'examDate': _examDate,
+                          'examSessionId': _examSessionId,
                           'hoursPerWeek': _hoursPerWeek,
                         },
                       ),
@@ -258,7 +260,10 @@ class _StudyOptionCard extends StatelessWidget {
                 child: Center(
                   child: Text(
                     option.emoji,
-                    style: const TextStyle(fontSize: 22),
+                    style: const TextStyle(
+                      fontFamily: 'TossFace',
+                      fontSize: 22,
+                    ),
                   ),
                 ),
               ),

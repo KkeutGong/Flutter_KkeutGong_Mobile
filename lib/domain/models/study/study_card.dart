@@ -12,4 +12,14 @@ class StudyCard {
     this.isFavorite = false,
     this.isKnown = false,
   });
+
+  factory StudyCard.fromJson(Map<String, dynamic> json) {
+    return StudyCard(
+      id: json['id'] as String,
+      question: json['question'] as String,
+      answer: json['answer'] as String,
+      isFavorite: (json['isFavorite'] as bool?) ?? false,
+      isKnown: (json['isKnown'] as bool?) ?? false,
+    );
+  }
 }

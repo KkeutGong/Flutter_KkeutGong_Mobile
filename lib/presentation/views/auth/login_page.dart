@@ -3,12 +3,15 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:intl/intl.dart';
 import 'package:kkeutgong_mobile/core/api/api_client.dart';
 import 'package:kkeutgong_mobile/core/routes/app_routes.dart';
 import 'package:kkeutgong_mobile/data/repositories/auth/auth_repository.dart';
+import 'package:kkeutgong_mobile/data/repositories/stats/stats_repository.dart';
 import 'package:kkeutgong_mobile/gen/assets.gen.dart';
 import 'package:kkeutgong_mobile/presentation/widgets/common/custom_button.dart';
 import 'package:kkeutgong_mobile/shared/styles/colors.dart';
+import 'package:kkeutgong_mobile/shared/styles/typography.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class LoginPage extends StatefulWidget {
@@ -20,15 +23,32 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   final AuthRepository _auth = AuthRepository();
+  final StatsRepository _stats = StatsRepository();
   bool _isLoading = false;
+  int? _passerCount;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPasserCount();
+  }
+
+  Future<void> _loadPasserCount() async {
+    try {
+      final count = await _stats.getPasserCount();
+      if (mounted) setState(() => _passerCount = count);
+    } catch (_) {
+      // Background fetch — failure just leaves the placeholder visible.
+    }
+  }
 
   Future<void> _loginWithKakao() async {
     if (_isLoading) return;
     setState(() => _isLoading = true);
     try {
-      await _auth.loginWithKakao();
+      final result = await _auth.loginWithKakao();
       if (!mounted) return;
-      await _afterLogin();
+      await _afterLogin(result);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -43,9 +63,9 @@ class _LoginPageState extends State<LoginPage> {
     if (_isLoading) return;
     setState(() => _isLoading = true);
     try {
-      await _auth.loginWithGoogle();
+      final result = await _auth.loginWithGoogle();
       if (!mounted) return;
-      await _afterLogin();
+      await _afterLogin(result);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -60,9 +80,9 @@ class _LoginPageState extends State<LoginPage> {
     if (_isLoading) return;
     setState(() => _isLoading = true);
     try {
-      await _auth.loginWithApple();
+      final result = await _auth.loginWithApple();
       if (!mounted) return;
-      await _afterLogin();
+      await _afterLogin(result);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -73,37 +93,71 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-  Future<void> _afterLogin() async {
+  Future<void> _afterLogin(AuthResult auth) async {
     final prefs = await SharedPreferences.getInstance();
-    final hasOnboarded = prefs.getBool('has_onboarded') ?? false;
     if (!mounted) return;
-    if (hasOnboarded) {
-      // Check if user actually has certificates registered
-      final hasCerts = await _hasUserCertificates();
-      if (!mounted) return;
-      if (hasCerts) {
-        Get.offAllNamed(AppRoutes.main);
-      } else {
-        Get.offAllNamed(AppRoutes.onboarding);
-      }
+
+    // Pending onboarding data (collected on the welcome flow before login)
+    // takes priority — apply it and route to main.
+    final certId = prefs.getString('pending_onboarding_certificateId');
+    if (certId != null) {
+      await _applyPendingOnboarding(prefs, certId);
+      return;
+    }
+
+    // Brand-new accounts: stop at the nickname confirmation screen before
+    // onboarding so users don't end up stuck with the auto-filled name from
+    // their social provider (e.g. '끝공 수험생' for Kakao without nickname scope).
+    if (auth.isNewUser) {
+      Get.offAllNamed(
+        AppRoutes.profileSetup,
+        arguments: {'nickname': auth.nickname},
+      );
+      return;
+    }
+
+    // No pending data: server is the source of truth. An existing user
+    // logging in on a fresh install has has_onboarded=false locally but
+    // already has certificates registered server-side, so they must skip
+    // onboarding instead of being looped back into it.
+    final hadOnboarded = prefs.getBool('has_onboarded') ?? false;
+    final hasCerts = await _hasUserCertificates(fallback: hadOnboarded);
+    if (!mounted) return;
+    if (hasCerts) {
+      await prefs.setBool('has_onboarded', true);
+      Get.offAllNamed(AppRoutes.main);
     } else {
-      // Check for pending onboarding data saved before login
-      final certId = prefs.getString('pending_onboarding_certificateId');
-      if (certId != null) {
-        await _applyPendingOnboarding(prefs, certId);
-      } else {
-        Get.offAllNamed(AppRoutes.onboarding);
-      }
+      Get.offAllNamed(AppRoutes.onboarding);
     }
   }
 
-  Future<bool> _hasUserCertificates() async {
+  // Maps the Korean label saved during onboarding step 4 to the enum the
+  // backend understands. Returns null when the user skipped this step.
+  String? _mapStyleTextToEnum(String? styleText) {
+    switch (styleText) {
+      case '빠른 문제 풀이':
+        return 'fast';
+      case '개념 위주':
+        return 'concept';
+      case '해설 위주':
+        return 'explanation';
+      case '반복 학습':
+        return 'repetition';
+      default:
+        return null;
+    }
+  }
+
+  Future<bool> _hasUserCertificates({required bool fallback}) async {
     try {
       final api = ApiClient();
       final result = await api.get('/users/me/certificates') as List;
       return result.isNotEmpty;
     } catch (_) {
-      return true; // Assume has certs on error to avoid redirect loop
+      // Onboarded users keep their session; fresh installs default to
+      // onboarding so brand-new accounts aren't pushed straight to main on a
+      // transient network error.
+      return fallback;
     }
   }
 
@@ -119,10 +173,13 @@ class _LoginPageState extends State<LoginPage> {
     try {
       final examDate = prefs.getString('pending_onboarding_examDate');
       final hoursPerWeek = prefs.getInt('pending_onboarding_hoursPerWeek') ?? 7;
+      final styleText = prefs.getString('pending_onboarding_style');
+      final studyStyle = _mapStyleTextToEnum(styleText);
       final body = <String, dynamic>{
         'certificateId': certId,
         'hoursPerWeek': hoursPerWeek,
         if (examDate != null) 'examDate': examDate,
+        if (studyStyle != null) 'studyStyle': studyStyle,
       };
       await api.post('/curricula/generate', body: body);
     } catch (_) {
@@ -157,63 +214,16 @@ class _LoginPageState extends State<LoginPage> {
               Column(
                 children: [
                   Text(
-                    '끝공',
+                    '끝공으로 합격한 합격자 수',
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontFamily: 'SeoulAlrim',
-                      fontSize: 48,
-                      fontWeight: FontWeight.w800,
-                      height: 1.2,
-                      letterSpacing: -1.4,
-                      color: colors.primaryNormal,
-                    ),
+                    style: Typo.bodyRegular(context).copyWith(color: colors.gray900),
                   ),
-                  const SizedBox(height: 12),
                   Text(
-                    '포기하지 않는 경험을 만듭니다.',
+                    _passerCount != null
+                        ? NumberFormat.decimalPattern('en_US').format(_passerCount)
+                        : '—',
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontFamily: 'SeoulAlrim',
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      height: 1.4,
-                      letterSpacing: -0.4,
-                      color: colors.gray500,
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: colors.primaryLight,
-                      borderRadius: BorderRadius.circular(99),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          '합격자 수',
-                          style: TextStyle(
-                            fontFamily: 'Pretendard',
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            color: colors.primaryDark,
-                            letterSpacing: -0.2,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          '102,870,965',
-                          style: TextStyle(
-                            fontFamily: 'SeoulAlrim',
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: -0.4,
-                            color: colors.primaryNormal,
-                          ),
-                        ),
-                      ],
-                    ),
+                    style: Typo.displayStrong(context),
                   ),
                 ],
               ),

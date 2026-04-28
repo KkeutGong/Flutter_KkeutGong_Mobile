@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:kkeutgong_mobile/data/repositories/catalog/catalog_repository.dart';
+import 'package:kkeutgong_mobile/domain/models/home/certificate.dart';
 import 'package:kkeutgong_mobile/shared/styles/colors.dart';
 import 'package:kkeutgong_mobile/shared/styles/typography.dart';
 import 'package:kkeutgong_mobile/gen/assets.gen.dart';
@@ -25,17 +27,63 @@ class _OnboardingContainerPageState extends State<OnboardingContainerPage> {
   DateTime? _pickedExamDate;
   bool _noFixedDate = false;
 
+  // Certificate catalog loaded from /catalog/certificates. Populated lazily so
+  // adding a new cert in the backend never requires a mobile release.
+  final CatalogRepository _catalog = CatalogRepository();
+  bool _certsLoading = true;
+  String? _certsError;
+  Map<String, Certificate> _certByName = const {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCertificates();
+  }
+
+  Future<void> _loadCertificates() async {
+    setState(() {
+      _certsLoading = true;
+      _certsError = null;
+    });
+    try {
+      final certs = await _catalog.getCertificates();
+      if (!mounted) return;
+      _certByName = {for (final c in certs) c.name: c};
+      _stepData[0]['options'] = certs
+          .map((c) => {'icon': _certIconAsset(c.icon), 'text': c.name})
+          .toList();
+      setState(() => _certsLoading = false);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _certsError = '자격증 목록을 불러오지 못했어요.';
+        _certsLoading = false;
+      });
+    }
+  }
+
+  // Backend returns the icon as a string identifier; map it to a bundled SVG.
+  // Falls back to the memory icon for unknown identifiers so a new backend
+  // value never blanks the row.
+  dynamic _certIconAsset(String iconName) {
+    switch (iconName) {
+      case 'desktop_mac':
+        return Assets.icons.desktopMac;
+      case 'menu_book':
+        return Assets.icons.menuBook;
+      case 'memory':
+      default:
+        return Assets.icons.memory;
+    }
+  }
+
   final List<Map<String, dynamic>> _stepData = [
     {
       'title': '어떤 자격증을 준비중인지 알려주세요',
       'subtitle': '나중에 다른 자격증도 공부할 수 있어요.',
       'hasInfoIcon': true,
       'paddingLeft': 30.0,
-      'options': [
-        {'icon': Assets.icons.desktopMac, 'text': '컴퓨터활용능력 2급'},
-        {'icon': Assets.icons.menuBook, 'text': '한국사능력검정시험 심화'},
-        {'icon': Assets.icons.memory, 'text': '정보처리기능사'},
-      ],
+      'options': <Map<String, dynamic>>[],
     },
     {
       'title': '언제까지 합격하고 싶은지 알려주세요',
@@ -78,18 +126,19 @@ class _OnboardingContainerPageState extends State<OnboardingContainerPage> {
     },
   ];
 
-  // Maps option text to certificateId matching backend externalIds
-  static const Map<String, String> _certTextToId = {
-    '컴퓨터활용능력 2급': '2',
-    '한국사능력검정시험 심화': '3',
-    '정보처리기능사': '1',
-  };
+  // Resolves the user-selected certificate name to the externalId expected by
+  // the backend. Falls back to '1' for safety, but the catalog is fetched up
+  // front so this should never miss in practice.
+  String _certIdForName(String? name) =>
+      (name != null ? _certByName[name]?.id : null) ?? '1';
 
-  // Maps hours option text to hoursPerWeek int
+  // Maps daily-minutes option text to weekly hours sent to the backend.
+  // Conversion: ceil(minutesPerDay × 7 ÷ 60), with 1 as the floor so a 5-minute
+  // pick still gets at least one hour scheduled per week.
   static const Map<String, int> _hoursTextToInt = {
     '5분': 1,
-    '10분': 1,
-    '30분': 1,
+    '10분': 2,
+    '30분': 4,
     '1시간': 7,
     '2시간 이상': 14,
   };
@@ -138,7 +187,7 @@ class _OnboardingContainerPageState extends State<OnboardingContainerPage> {
     final styleText = _pendingSelections[3];
 
     if (certText != null) {
-      final certId = _certTextToId[certText] ?? '1';
+      final certId = _certIdForName(certText);
       await prefs.setString('pending_onboarding_certificateId', certId);
     }
     if (!_noFixedDate && _pickedExamDate != null) {
@@ -270,6 +319,8 @@ class _OnboardingContainerPageState extends State<OnboardingContainerPage> {
                     _buildNotificationContent(colors, screenWidth)
                   else if (stepData['isDatePickerStep'] == true)
                     _buildDatePickerOptions(colors)
+                  else if (_currentStep == 0 && (_certsLoading || _certsError != null))
+                    _buildCertLoadingState(colors)
                   else
                     _buildOptions(colors, stepData['options']),
                 ],
@@ -361,6 +412,32 @@ class _OnboardingContainerPageState extends State<OnboardingContainerPage> {
         .replaceAll('일', '')
         .toLowerCase();
     return '$stepPrefix-$slug';
+  }
+
+  Widget _buildCertLoadingState(ThemeColors colors) {
+    if (_certsError != null) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 32),
+        child: Column(
+          children: [
+            Text(
+              _certsError!,
+              style: Typo.bodyRegular(context, color: colors.gray500),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            TextButton(
+              onPressed: _loadCertificates,
+              child: Text('다시 시도', style: Typo.bodyRegular(context, color: colors.primaryNormal)),
+            ),
+          ],
+        ),
+      );
+    }
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: 60),
+      child: Center(child: CircularProgressIndicator()),
+    );
   }
 
   Widget _buildOptions(ThemeColors colors, List<Map<String, dynamic>> options) {

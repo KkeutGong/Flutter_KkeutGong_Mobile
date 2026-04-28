@@ -1,0 +1,14 @@
+{
+  "@@locale": "en",
+  "appName": "KkeutGong",
+  "start": "Get Started",
+  "next": "Next",
+  "previous": "Back",
+  "correct": "Correct",
+  "incorrect": "Incorrect",
+  "continue_action": "Continue",
+  "logout": "Log Out",
+  "settings": "Settings",
+  "loading": "Loading…",
+  "retry": "Try Again"
+}

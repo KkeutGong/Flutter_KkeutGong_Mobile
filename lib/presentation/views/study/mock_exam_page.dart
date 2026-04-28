@@ -149,6 +149,72 @@ class _MockExamPageState extends State<MockExamPage> {
       );
     }
 
+    if (_viewModel.state == ExamState.submitFailed) {
+      // Don't fall back to fake client-side scoring — make the user retry so
+      // they always see the same pass/fail the server records.
+      return Scaffold(
+        backgroundColor: colors.gray20,
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.cloud_off, size: 56, color: colors.gray500),
+                  const SizedBox(height: 16),
+                  Text(
+                    '결과를 저장하지 못했어요',
+                    style: TextStyle(
+                      fontFamily: 'SeoulAlrim',
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: colors.gray900,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '네트워크 상태를 확인하고 다시 시도해 주세요.',
+                    style: TextStyle(
+                      fontFamily: 'Pretendard',
+                      fontSize: 14,
+                      color: colors.gray500,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 32),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: colors.primaryNormal,
+                        foregroundColor: colors.gray0,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onPressed: _viewModel.retrySubmit,
+                      child: const Text('다시 제출'),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: Text(
+                      '나가기',
+                      style: TextStyle(color: colors.gray500),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     return _ExamPage(
       questions: _viewModel.questions,
       currentIndex: _viewModel.currentIndex,

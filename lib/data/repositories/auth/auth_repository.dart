@@ -10,11 +10,15 @@ class AuthResult {
   final String refreshToken;
   final String userId;
   final String nickname;
+  // True when the backend created a brand-new account on this login. Used to
+  // route into the post-signup nickname confirmation step.
+  final bool isNewUser;
   const AuthResult({
     required this.accessToken,
     required this.refreshToken,
     required this.userId,
     required this.nickname,
+    required this.isNewUser,
   });
 }
 
@@ -89,7 +93,7 @@ class AuthRepository {
       // Best-effort server logout; always clear local tokens.
     } finally {
       await _tokenStore.clear();
-      _session.userId = 'demo-user';
+      _session.userId = '';
     }
   }
 
@@ -118,6 +122,7 @@ class AuthRepository {
       refreshToken: json['refreshToken'] as String,
       userId: user['id'] as String,
       nickname: user['nickname'] as String,
+      isNewUser: (json['isNewUser'] as bool?) ?? false,
     );
     await _tokenStore.saveTokens(
       access: result.accessToken,

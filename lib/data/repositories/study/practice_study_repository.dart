@@ -1,3 +1,5 @@
+import 'package:kkeutgong_mobile/core/api/api_client.dart';
+import 'package:kkeutgong_mobile/core/session/session.dart';
 import 'package:kkeutgong_mobile/domain/models/study/question.dart';
 
 class PracticeStudyRepository {
@@ -5,53 +7,62 @@ class PracticeStudyRepository {
   factory PracticeStudyRepository() => _instance;
   PracticeStudyRepository._internal();
 
+  final ApiClient _api = ApiClient();
+  final Session _session = Session();
+
   final Map<String, List<Question>> _cache = {};
   final Map<String, DateTime> _cacheTimestamps = {};
   static const Duration _cacheExpiry = Duration(minutes: 5);
 
-  bool _isCacheValid(String subjectName) {
-    final timestamp = _cacheTimestamps[subjectName];
-    if (timestamp == null) return false;
-    return DateTime.now().difference(timestamp) < _cacheExpiry;
+  bool _isCacheValid(String key) {
+    final ts = _cacheTimestamps[key];
+    if (ts == null) return false;
+    return DateTime.now().difference(ts) < _cacheExpiry;
   }
 
   Future<List<Question>> getQuestions(String subjectName, {bool forceRefresh = false}) async {
-    if (!forceRefresh && _cache.containsKey(subjectName) && _isCacheValid(subjectName)) {
-      return _cache[subjectName]!;
+    final key = '${_session.currentCertificateId}/$subjectName';
+    if (!forceRefresh && _cache.containsKey(key) && _isCacheValid(key)) {
+      return _cache[key]!;
     }
 
+    final subjectId = _session.subjectIdFor(subjectName);
+    if (subjectId == null) {
+      throw StateError('subjectId for "$subjectName" is unknown — load home first');
+    }
 
-    final questions = List.generate(
-      10,
-      (index) => Question(
-        id: 'q_$index',
-        number: index + 1,
-        text: '다음 중 옴의 법칙을 올바르게 나타낸 것은?',
-        choices: [
-          Choice(number: 1, text: 'V = IR', isCorrect: true),
-          Choice(number: 2, text: 'V = I/R'),
-          Choice(number: 3, text: 'V = R/I'),
-          Choice(number: 4, text: 'I = VR'),
-        ],
-        explanation: '옴의 법칙은 V = IR로 표현됩니다. 여기서 V는 전압(볼트), I는 전류(암페어), R은 저항(옴)을 나타냅니다.',
-      ),
-    );
+    final list = await _api.get('/study/practice', query: {
+      'userId': _session.userId,
+      'certificateId': _session.currentCertificateId,
+      'subjectId': subjectId,
+    }) as List;
 
-    _cache[subjectName] = questions;
-    _cacheTimestamps[subjectName] = DateTime.now();
+    final questions = list
+        .map((e) => Question.fromJson(e as Map<String, dynamic>))
+        .toList();
 
+    _cache[key] = questions;
+    _cacheTimestamps[key] = DateTime.now();
     return questions;
   }
 
-  Future<void> saveAnswer(String questionId, int answer) async {
-  }
-
-  Future<void> saveProgress(String subjectName, int currentIndex, int totalQuestions) async {
+  Future<void> saveAnswers({
+    required String subjectName,
+    required Map<String, int> answers,
+  }) async {
+    final subjectId = _session.subjectIdFor(subjectName);
+    if (subjectId == null) return;
+    await _api.post('/study/practice/progress', body: {
+      'userId': _session.userId,
+      'certificateId': _session.currentCertificateId,
+      'subjectId': subjectId,
+      'answers': answers,
+    });
   }
 
   void invalidateCache(String subjectName) {
-    _cache.remove(subjectName);
-    _cacheTimestamps.remove(subjectName);
+    _cache.remove('${_session.currentCertificateId}/$subjectName');
+    _cacheTimestamps.remove('${_session.currentCertificateId}/$subjectName');
   }
 
   void clearAllCache() {

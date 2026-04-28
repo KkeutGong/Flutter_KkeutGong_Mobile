@@ -6,6 +6,8 @@ import 'package:kkeutgong_mobile/presentation/views/onboarding/onboarding_genera
 import 'package:kkeutgong_mobile/presentation/views/onboarding/onboarding_hours_page.dart';
 import 'package:kkeutgong_mobile/presentation/views/onboarding/onboarding_welcome_page.dart';
 import 'package:kkeutgong_mobile/presentation/views/profile/add_certificate_page.dart';
+import 'package:kkeutgong_mobile/presentation/views/profile/profile_edit_page.dart';
+import 'package:kkeutgong_mobile/presentation/views/profile/profile_setup_page.dart';
 import 'package:kkeutgong_mobile/presentation/views/study/concept_study_page.dart';
 import 'package:kkeutgong_mobile/presentation/views/study/mock_exam_page.dart';
 import 'package:kkeutgong_mobile/presentation/views/study/practice_study_page.dart';
@@ -22,6 +24,8 @@ class AppRoutes {
   static const String review = '/study/review';
   static const String mockExam = '/study/mock-exam';
   static const String addCertificate = '/certificates/add';
+  static const String profileSetup = '/profile/setup';
+  static const String profileEdit = '/profile/edit';
 
   static List<GetPage> routes = [
     GetPage(
@@ -83,6 +87,16 @@ class AppRoutes {
     GetPage(
       name: addCertificate,
       page: () => const AddCertificatePage(),
+      transition: Transition.rightToLeft,
+    ),
+    GetPage(
+      name: profileSetup,
+      page: () => const ProfileSetupPage(),
+      transition: Transition.fadeIn,
+    ),
+    GetPage(
+      name: profileEdit,
+      page: () => const ProfileEditPage(),
       transition: Transition.rightToLeft,
     ),
   ];

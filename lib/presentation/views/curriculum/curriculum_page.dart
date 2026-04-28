@@ -97,6 +97,7 @@ class _CurriculumPageState extends State<CurriculumPage> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       _buildSummarySection(context, colors, data, scale, isTablet, horizontalPadding),
+                      _buildTodayPlanSection(context, colors, scale, horizontalPadding),
                       if (sectionWidgets.isNotEmpty) ...[
                         const SizedBox(height: 60),
                         ...sectionWidgets,
@@ -196,7 +197,13 @@ class _CurriculumPageState extends State<CurriculumPage> {
     final progressValue = _viewModel.progress.clamp(0.0, 1.0);
     final percentage = (progressValue * 100).round();
     final isExamReady = _viewModel.isExamReady;
-    final dDayLabel = dDay <= 0 ? 'D-DAY' : 'D-$dDay';
+    // No curriculum yet → don't pretend "today is exam day". Show a neutral
+    // placeholder until the user finishes onboarding.
+    final dDayLabel = !_viewModel.hasExamDate
+        ? '시험일 미정'
+        : dDay <= 0
+            ? 'D-DAY'
+            : 'D-$dDay';
 
     return Container(
       decoration: BoxDecoration(
@@ -275,6 +282,74 @@ class _CurriculumPageState extends State<CurriculumPage> {
         ],
       ),
     );
+  }
+
+  Widget _buildTodayPlanSection(
+    BuildContext context,
+    ThemeColors colors,
+    double scale,
+    double horizontalPadding,
+  ) {
+    // Hides itself when the user has no curriculum or today is past the
+    // generated plan window. The summary section above already shows D-day,
+    // so an empty state here would be redundant.
+    final counts = _viewModel.todayTaskCounts;
+    if (counts.conceptCount == 0 && counts.practiceCount == 0) {
+      return const SizedBox.shrink();
+    }
+    final today = DateTime.now();
+    final dateLabel = '${today.month}월 ${today.day}일';
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(horizontalPadding, 16 * scale, horizontalPadding, 0),
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 18 * scale, vertical: 14 * scale),
+        decoration: BoxDecoration(
+          color: colors.primaryLight,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: colors.primaryNormal.withValues(alpha: 0.25)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: colors.primaryNormal,
+                borderRadius: BorderRadius.circular(99),
+              ),
+              child: Text(
+                '오늘의 학습',
+                style: TextStyle(
+                  fontFamily: 'Pretendard',
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: colors.gray0,
+                  letterSpacing: -0.2,
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                _todayTasksLabel(counts.conceptCount, counts.practiceCount),
+                style: Typo.bodyRegular(context, color: colors.gray900),
+              ),
+            ),
+            Text(
+              dateLabel,
+              style: Typo.labelRegular(context, color: colors.gray500),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _todayTasksLabel(int concept, int practice) {
+    final parts = <String>[];
+    if (concept > 0) parts.add('개념 $concept장');
+    if (practice > 0) parts.add('문제 $practice개');
+    return parts.join(' · ');
   }
 
   Widget _buildOverallProgressBar(ThemeColors colors, double progress) {

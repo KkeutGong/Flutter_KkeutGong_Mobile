@@ -5,9 +5,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:kkeutgong_mobile/core/notifications/notification_service.dart';
 import 'package:kkeutgong_mobile/core/routes/app_routes.dart';
+import 'package:kkeutgong_mobile/core/session/session.dart';
 import 'package:kkeutgong_mobile/data/repositories/auth/auth_repository.dart';
 import 'package:kkeutgong_mobile/data/repositories/home/home_repository.dart';
 import 'package:kkeutgong_mobile/data/repositories/study/study_progress_repository.dart';
+import 'package:kkeutgong_mobile/data/repositories/user/user_repository.dart';
 import 'package:kkeutgong_mobile/shared/styles/colors.dart';
 import 'package:kkeutgong_mobile/shared/styles/typography.dart';
 
@@ -21,12 +23,14 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState extends State<ProfilePage> {
   final _authRepo = AuthRepository();
   final _progressRepo = StudyProgressRepository();
+  final _userRepo = UserRepository();
   final _notificationService = NotificationService();
 
   bool _notificationsEnabled = false;
   ThemeMode _themeMode = ThemeMode.system;
   String _appVersion = '';
   bool _loading = false;
+  String? _nickname;
 
   static const _prefNotifications = 'notifications_enabled';
   static const _prefThemeMode = 'theme_mode';
@@ -36,6 +40,21 @@ class _ProfilePageState extends State<ProfilePage> {
     super.initState();
     _loadPrefs();
     _loadVersion();
+    _loadNickname();
+  }
+
+  Future<void> _loadNickname() async {
+    try {
+      final me = await _userRepo.getMe(Session().userId);
+      if (mounted) setState(() => _nickname = me.nickname);
+    } catch (_) {
+      // Profile load failure is non-fatal — header just shows nothing.
+    }
+  }
+
+  Future<void> _openProfileEdit() async {
+    final updated = await Get.toNamed(AppRoutes.profileEdit);
+    if (updated == true) await _loadNickname();
   }
 
   Future<void> _loadPrefs() async {
@@ -242,6 +261,7 @@ class _ProfilePageState extends State<ProfilePage> {
           ? const Center(child: CircularProgressIndicator())
           : ListView(
               children: [
+                _profileHeader(context, colors),
                 _sectionHeader(context, colors, '앱 설정'),
                 _switchTile(
                   context,
@@ -329,6 +349,57 @@ class _ProfilePageState extends State<ProfilePage> {
                 const SizedBox(height: 32),
               ],
             ),
+    );
+  }
+
+  Widget _profileHeader(BuildContext context, ThemeColors colors) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+      child: Material(
+        color: colors.gray0,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: _openProfileEdit,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 26,
+                  backgroundColor: colors.primaryLight,
+                  child: Icon(Icons.person, color: colors.primaryNormal, size: 28),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _nickname ?? '닉네임 불러오는 중…',
+                        style: TextStyle(
+                          fontFamily: 'SeoulAlrim',
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          height: 1.3,
+                          letterSpacing: -0.3,
+                          color: colors.gray900,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '프로필 편집',
+                        style: Typo.labelRegular(context, color: colors.gray500),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right, color: colors.gray300),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 

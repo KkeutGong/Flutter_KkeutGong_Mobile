@@ -1,0 +1,35 @@
+{
+  "@@locale": "ko",
+  "appName": "끝공",
+  "@appName": { "description": "Application name" },
+
+  "start": "시작하기",
+  "@start": { "description": "Start button label" },
+
+  "next": "다음",
+  "@next": { "description": "Next button label" },
+
+  "previous": "이전",
+  "@previous": { "description": "Previous button label" },
+
+  "correct": "정답",
+  "@correct": { "description": "Correct answer label" },
+
+  "incorrect": "오답",
+  "@incorrect": { "description": "Incorrect answer label" },
+
+  "continue_action": "계속하기",
+  "@continue_action": { "description": "Continue button label" },
+
+  "logout": "로그아웃",
+  "@logout": { "description": "Logout label" },
+
+  "settings": "설정",
+  "@settings": { "description": "Settings screen title" },
+
+  "loading": "불러오는 중…",
+  "@loading": { "description": "Loading state text" },
+
+  "retry": "다시 시도",
+  "@retry": { "description": "Retry button label" }
+}

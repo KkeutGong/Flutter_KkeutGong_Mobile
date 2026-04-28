@@ -6,6 +6,10 @@ import 'package:kkeutgong_mobile/domain/models/home/subject.dart';
 class HomeData {
   final Certificate currentCertificate;
   final int currentDay;
+  // Server-computed countdown. Null when the user hasn't generated a curriculum
+  // yet for this certificate (e.g. brand-new account).
+  final DateTime? examDate;
+  final int? daysRemaining;
   final double progress;
   final int streakDays;
   final StreakInfo streakInfo;
@@ -16,6 +20,8 @@ class HomeData {
   HomeData({
     required this.currentCertificate,
     required this.currentDay,
+    required this.examDate,
+    required this.daysRemaining,
     required this.progress,
     required this.streakDays,
     required this.streakInfo,
@@ -25,9 +31,13 @@ class HomeData {
   });
 
   factory HomeData.fromJson(Map<String, dynamic> json) {
+    final rawExamDate = json['examDate'] as String?;
+    final rawDaysRemaining = json['daysRemaining'] as num?;
     return HomeData(
       currentCertificate: Certificate.fromJson(json['currentCertificate'] as Map<String, dynamic>),
       currentDay: json['currentDay'] as int,
+      examDate: rawExamDate != null ? DateTime.parse(rawExamDate) : null,
+      daysRemaining: rawDaysRemaining?.toInt(),
       progress: (json['progress'] as num).toDouble(),
       streakDays: json['streakDays'] as int,
       streakInfo: StreakInfo.fromJson(json['streakInfo'] as Map<String, dynamic>),

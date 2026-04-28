@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:kkeutgong_mobile/presentation/views/auth/login_page.dart';
 import 'package:kkeutgong_mobile/presentation/widgets/common/custom_button.dart';
 import 'package:kkeutgong_mobile/shared/styles/colors.dart';
@@ -74,12 +75,10 @@ class OnboardingLoadingPage extends StatelessWidget {
         theme: CustomButtonTheme.primary,
         width: double.infinity,
         onPressed: () {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const LoginPage(),
-            ),
-          );
+          // Drop the onboarding stack entirely so back-button from the login
+          // page doesn't put the user back into the half-finished onboarding
+          // flow they just completed.
+          Get.offAll(() => const LoginPage());
         },
       ),
     );

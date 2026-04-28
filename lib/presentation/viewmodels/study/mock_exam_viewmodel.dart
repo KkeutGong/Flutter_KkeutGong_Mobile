@@ -4,7 +4,7 @@ import 'package:kkeutgong_mobile/data/repositories/study/mock_exam_repository.da
 import 'package:kkeutgong_mobile/domain/models/study/question.dart';
 import 'package:kkeutgong_mobile/domain/models/study/exam_result.dart';
 
-enum ExamState { ready, inProgress, submitted }
+enum ExamState { ready, inProgress, submitted, submitFailed }
 
 class MockExamViewModel extends ChangeNotifier {
   final MockExamRepository _repository;
@@ -65,8 +65,9 @@ class MockExamViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _questions = await _repository.getQuestions(examName, forceRefresh: forceRefresh);
-      _remainingSeconds = timeLimitMinutes * 60;
+      final session = await _repository.startExam(examName: examName);
+      _questions = session.questions;
+      _remainingSeconds = session.timeLimitMinutes * 60;
       _isLoading = false;
       _isInitialized = true;
       notifyListeners();
@@ -123,37 +124,46 @@ class MockExamViewModel extends ChangeNotifier {
     }
   }
 
-  void submitExam() {
+  Future<void> submitExam() async {
     _timer?.cancel();
     _currentIndex = 0;
 
-    for (final question in _questions) {
-      if (question.selectedAnswer != null) {
-        question.isCorrect = question.selectedAnswer == question.correctAnswer;
+    final answers = <String, int>{};
+    for (final q in _questions) {
+      if (q.selectedAnswer != null) {
+        q.isCorrect = q.selectedAnswer == q.correctAnswer;
+        answers[q.id] = q.selectedAnswer!;
       } else {
-        question.isCorrect = false;
+        q.isCorrect = false;
       }
     }
 
-    final correctCount = _questions.where((q) => q.isCorrect == true).length;
-    final subjectScores = <String, SubjectScore>{
-      '전기이론': SubjectScore(
-        name: '전기이론',
-        totalQuestions: _questions.length,
-        correctCount: correctCount,
-      ),
-    };
+    try {
+      _result = await _repository.submitExam(
+        examName: examName,
+        answers: answers,
+        elapsedSeconds: _elapsedSeconds,
+      );
+      _state = ExamState.submitted;
+    } catch (e) {
+      // Don't fabricate a pass/fail client-side — the backend formula may
+      // differ and showing a wrong result is worse than asking the user to
+      // retry. The page renders an error UI when state == submitFailed.
+      _error = e.toString();
+      _state = ExamState.submitFailed;
+    }
 
-    _result = ExamResult(
-      totalQuestions: _questions.length,
-      correctCount: correctCount,
-      elapsedTime: Duration(seconds: _elapsedSeconds),
-      isPassed: correctCount >= (_questions.length * 0.6).round(),
-      subjectScores: subjectScores,
-    );
-
-    _state = ExamState.submitted;
     notifyListeners();
+  }
+
+  /// Re-attempts submission after a failed network call. Resumes the timer
+  /// only if the exam wasn't actually completed (no questions answered) so
+  /// the user isn't penalised for the network blip.
+  Future<void> retrySubmit() async {
+    if (_state != ExamState.submitFailed) return;
+    _state = ExamState.inProgress;
+    notifyListeners();
+    await submitExam();
   }
 
   void reset() {
@@ -164,10 +174,9 @@ class MockExamViewModel extends ChangeNotifier {
     _remainingSeconds = 0;
     _elapsedSeconds = 0;
     _result = null;
+    _error = null;
     _isLoading = false;
     _isInitialized = false;
-    _error = null;
-    _repository.invalidateCache(examName);
   }
 
   @override
