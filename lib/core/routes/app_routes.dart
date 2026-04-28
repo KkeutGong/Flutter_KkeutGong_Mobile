@@ -5,6 +5,7 @@ import 'package:kkeutgong_mobile/presentation/views/onboarding/onboarding_exam_d
 import 'package:kkeutgong_mobile/presentation/views/onboarding/onboarding_generating_page.dart';
 import 'package:kkeutgong_mobile/presentation/views/onboarding/onboarding_hours_page.dart';
 import 'package:kkeutgong_mobile/presentation/views/onboarding/onboarding_welcome_page.dart';
+import 'package:kkeutgong_mobile/presentation/views/profile/add_certificate_page.dart';
 import 'package:kkeutgong_mobile/presentation/views/study/concept_study_page.dart';
 import 'package:kkeutgong_mobile/presentation/views/study/mock_exam_page.dart';
 import 'package:kkeutgong_mobile/presentation/views/study/practice_study_page.dart';
@@ -20,6 +21,7 @@ class AppRoutes {
   static const String practiceStudy = '/study/practice';
   static const String review = '/study/review';
   static const String mockExam = '/study/mock-exam';
+  static const String addCertificate = '/certificates/add';
 
   static List<GetPage> routes = [
     GetPage(
@@ -76,6 +78,11 @@ class AppRoutes {
         examName: Get.arguments?['examName'] ?? '모의고사',
         timeLimitMinutes: Get.arguments?['timeLimitMinutes'] ?? 150,
       ),
+      transition: Transition.rightToLeft,
+    ),
+    GetPage(
+      name: addCertificate,
+      page: () => const AddCertificatePage(),
       transition: Transition.rightToLeft,
     ),
   ];

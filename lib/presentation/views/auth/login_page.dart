@@ -79,7 +79,14 @@ class _LoginPageState extends State<LoginPage> {
     final hasOnboarded = prefs.getBool('has_onboarded') ?? false;
     if (!mounted) return;
     if (hasOnboarded) {
-      Get.offAllNamed(AppRoutes.main);
+      // Check if user actually has certificates registered
+      final hasCerts = await _hasUserCertificates();
+      if (!mounted) return;
+      if (hasCerts) {
+        Get.offAllNamed(AppRoutes.main);
+      } else {
+        Get.offAllNamed(AppRoutes.onboarding);
+      }
     } else {
       // Check for pending onboarding data saved before login
       final certId = prefs.getString('pending_onboarding_certificateId');
@@ -91,8 +98,25 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  Future<bool> _hasUserCertificates() async {
+    try {
+      final api = ApiClient();
+      final result = await api.get('/users/me/certificates') as List;
+      return result.isNotEmpty;
+    } catch (_) {
+      return true; // Assume has certs on error to avoid redirect loop
+    }
+  }
+
   Future<void> _applyPendingOnboarding(
       SharedPreferences prefs, String certId) async {
+    final api = ApiClient();
+    try {
+      // Register certificate for this user first
+      await api.post('/users/me/certificates', body: {'certificateId': certId});
+    } catch (_) {
+      // Best-effort — proceed even if already registered
+    }
     try {
       final examDate = prefs.getString('pending_onboarding_examDate');
       final hoursPerWeek = prefs.getInt('pending_onboarding_hoursPerWeek') ?? 7;
@@ -101,7 +125,6 @@ class _LoginPageState extends State<LoginPage> {
         'hoursPerWeek': hoursPerWeek,
         if (examDate != null) 'examDate': examDate,
       };
-      final api = ApiClient();
       await api.post('/curricula/generate', body: body);
     } catch (_) {
       // Ignore curriculum generation errors — still mark onboarded

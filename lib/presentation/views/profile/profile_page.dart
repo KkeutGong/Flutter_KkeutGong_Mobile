@@ -257,6 +257,14 @@ class _ProfilePageState extends State<ProfilePage> {
                 _actionTile(
                   context,
                   colors,
+                  icon: Icons.workspace_premium_outlined,
+                  title: '내 자격증 관리',
+                  identifier: 'settings-manage-certificates',
+                  onTap: () => Get.toNamed(AppRoutes.addCertificate),
+                ),
+                _actionTile(
+                  context,
+                  colors,
                   icon: Icons.refresh,
                   title: '학습 기록 초기화',
                   identifier: 'settings-reset-progress',
@@ -344,21 +352,21 @@ class _ProfilePageState extends State<ProfilePage> {
     String? identifier,
   }) {
     return Semantics(
-      button: true,
       identifier: identifier,
-      label: title,
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-        decoration: BoxDecoration(
-          color: colors.gray0,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: SwitchListTile(
-          secondary: Icon(icon, color: colors.gray900),
-          title: Text(title, style: Typo.bodyRegular(context, color: colors.gray900)),
-          value: value,
-          onChanged: onChanged,
-          activeThumbColor: colors.primaryNormal,
+      child: MergeSemantics(
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+          decoration: BoxDecoration(
+            color: colors.gray0,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: SwitchListTile(
+            secondary: Icon(icon, color: colors.gray900),
+            title: Text(title, style: Typo.bodyRegular(context, color: colors.gray900)),
+            value: value,
+            onChanged: onChanged,
+            activeThumbColor: colors.primaryNormal,
+          ),
         ),
       ),
     );
@@ -366,37 +374,37 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Widget _themeTile(BuildContext context, ThemeColors colors) {
     return Semantics(
-      button: true,
       identifier: 'settings-darkmode',
-      label: '다크 모드',
-      child: Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-      decoration: BoxDecoration(
-        color: colors.gray0,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: ListTile(
-        leading: Icon(Icons.dark_mode_outlined, color: colors.gray900),
-        title: Text('다크 모드', style: Typo.bodyRegular(context, color: colors.gray900)),
-        trailing: DropdownButton<ThemeMode>(
-          value: _themeMode,
-          underline: const SizedBox.shrink(),
-          items: ThemeMode.values
-              .map(
-                (m) => DropdownMenuItem(
-                  value: m,
-                  child: Text(
-                    _themeModeLabel(m),
-                    style: Typo.bodyRegular(context, color: colors.gray900),
-                  ),
-                ),
-              )
-              .toList(),
-          onChanged: (m) {
-            if (m != null) _setThemeMode(m);
-          },
+      child: MergeSemantics(
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+          decoration: BoxDecoration(
+            color: colors.gray0,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: ListTile(
+            leading: Icon(Icons.dark_mode_outlined, color: colors.gray900),
+            title: Text('다크 모드', style: Typo.bodyRegular(context, color: colors.gray900)),
+            trailing: DropdownButton<ThemeMode>(
+              value: _themeMode,
+              underline: const SizedBox.shrink(),
+              items: ThemeMode.values
+                  .map(
+                    (m) => DropdownMenuItem(
+                      value: m,
+                      child: Text(
+                        _themeModeLabel(m),
+                        style: Typo.bodyRegular(context, color: colors.gray900),
+                      ),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (m) {
+                if (m != null) _setThemeMode(m);
+              },
+            ),
+          ),
         ),
-      ),
       ),
     );
   }
@@ -411,23 +419,23 @@ class _ProfilePageState extends State<ProfilePage> {
     String? identifier,
   }) {
     return Semantics(
-      button: true,
       identifier: identifier,
-      label: title,
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-        decoration: BoxDecoration(
-          color: colors.gray0,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: ListTile(
-          leading: Icon(icon, color: titleColor ?? colors.gray900),
-          title: Text(
-            title,
-            style: Typo.bodyRegular(context, color: titleColor ?? colors.gray900),
+      child: MergeSemantics(
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+          decoration: BoxDecoration(
+            color: colors.gray0,
+            borderRadius: BorderRadius.circular(12),
           ),
-          trailing: Icon(Icons.chevron_right, color: colors.gray300),
-          onTap: onTap,
+          child: ListTile(
+            leading: Icon(icon, color: titleColor ?? colors.gray900),
+            title: Text(
+              title,
+              style: Typo.bodyRegular(context, color: titleColor ?? colors.gray900),
+            ),
+            trailing: Icon(Icons.chevron_right, color: colors.gray300),
+            onTap: onTap,
+          ),
         ),
       ),
     );

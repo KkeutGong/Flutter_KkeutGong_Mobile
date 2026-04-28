@@ -648,6 +648,27 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ),
               ],
+              if (otherCertificates.isNotEmpty) SizedBox(height: screenWidth * 0.025),
+              Semantics(
+                button: true,
+                identifier: 'home-add-certificate',
+                label: '자격증 추가',
+                child: GestureDetector(
+                  onTap: () {
+                    _viewModel.closeCertificateDropdown();
+                    Get.toNamed(AppRoutes.addCertificate);
+                  },
+                  child: SizedBox(
+                    width: dropdownItemSize,
+                    height: dropdownItemSize,
+                    child: Icon(
+                      Icons.add_circle_outline,
+                      size: dropdownItemSize * 0.85,
+                      color: colors.gray900,
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
         ),

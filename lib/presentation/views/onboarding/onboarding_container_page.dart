@@ -21,6 +21,10 @@ class _OnboardingContainerPageState extends State<OnboardingContainerPage> {
   // Stores the selected value for each step index (0=cert, 1=date, 2=hours, 3=style)
   final Map<int, String> _pendingSelections = {};
 
+  // Date picker state for step 1
+  DateTime? _pickedExamDate;
+  bool _noFixedDate = false;
+
   final List<Map<String, dynamic>> _stepData = [
     {
       'title': '어떤 자격증을 준비중인지 알려주세요',
@@ -38,11 +42,7 @@ class _OnboardingContainerPageState extends State<OnboardingContainerPage> {
       'subtitle': '시험 일정에 맞춰 커리큘럼을 생성할게요.',
       'hasInfoIcon': false,
       'paddingLeft': 30.0,
-      'options': [
-        {'text': '2025년 11월 23일'},
-        {'text': '2026년 3월 20일'},
-        {'text': '정해진 일정 없음'},
-      ],
+      'isDatePickerStep': true,
     },
     {
       'title': '하루에 공부할 수 있는 시간을 알려주세요',
@@ -94,6 +94,15 @@ class _OnboardingContainerPageState extends State<OnboardingContainerPage> {
     '2시간 이상': 14,
   };
 
+  bool get _currentStepComplete {
+    final step = _stepData[_currentStep];
+    if (step['isDatePickerStep'] == true) {
+      return _pickedExamDate != null || _noFixedDate;
+    }
+    if (step['isNotificationStep'] == true) return true;
+    return selectedValue != null;
+  }
+
   void _nextStep() async {
     if (_currentStep < _stepData.length - 1) {
       setState(() {
@@ -125,7 +134,6 @@ class _OnboardingContainerPageState extends State<OnboardingContainerPage> {
     // use the _pendingSelections map populated in _buildOptions onTap.
     final prefs = await SharedPreferences.getInstance();
     final certText = _pendingSelections[0];
-    final examText = _pendingSelections[1];
     final hoursText = _pendingSelections[2];
     final styleText = _pendingSelections[3];
 
@@ -133,8 +141,8 @@ class _OnboardingContainerPageState extends State<OnboardingContainerPage> {
       final certId = _certTextToId[certText] ?? '1';
       await prefs.setString('pending_onboarding_certificateId', certId);
     }
-    if (examText != null && examText != '정해진 일정 없음') {
-      await prefs.setString('pending_onboarding_examDate', examText);
+    if (!_noFixedDate && _pickedExamDate != null) {
+      await prefs.setString('pending_onboarding_examDate', _pickedExamDate!.toIso8601String());
     } else {
       await prefs.remove('pending_onboarding_examDate');
     }
@@ -194,13 +202,18 @@ class _OnboardingContainerPageState extends State<OnboardingContainerPage> {
           child: AppBar(
             backgroundColor: Colors.transparent,
             elevation: 0,
-            leading: IconButton(
-              icon: Assets.icons.arrowBackIos.svg(
-                width: 24.0,
-                height: 24.0,
-                colorFilter: ColorFilter.mode(colors.gray900, BlendMode.srcIn),
+            leading: Semantics(
+              button: true,
+              identifier: 'onboarding-back',
+              label: '뒤로 가기',
+              child: IconButton(
+                icon: Assets.icons.arrowBackIos.svg(
+                  width: 24.0,
+                  height: 24.0,
+                  colorFilter: ColorFilter.mode(colors.gray900, BlendMode.srcIn),
+                ),
+                onPressed: _previousStep,
               ),
-              onPressed: _previousStep,
             ),
             title: Container(
               height: 12,
@@ -255,6 +268,8 @@ class _OnboardingContainerPageState extends State<OnboardingContainerPage> {
                   const SizedBox(height: 60),
                   if (isNotificationStep)
                     _buildNotificationContent(colors, screenWidth)
+                  else if (stepData['isDatePickerStep'] == true)
+                    _buildDatePickerOptions(colors)
                   else
                     _buildOptions(colors, stepData['options']),
                 ],
@@ -417,11 +432,91 @@ class _OnboardingContainerPageState extends State<OnboardingContainerPage> {
         text: '계속하기',
         size: ButtonSize.large,
         theme: CustomButtonTheme.grayscale,
-        disabled: !isNotificationStep && selectedValue == null,
+        disabled: !_currentStepComplete,
         width: double.infinity,
-        onPressed:
-            (isNotificationStep || selectedValue != null) ? _nextStep : null,
+        onPressed: _currentStepComplete ? _nextStep : null,
       ),
+    );
+  }
+
+  Future<void> _pickExamDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _pickedExamDate ?? now.add(const Duration(days: 30)),
+      firstDate: now,
+      lastDate: DateTime(now.year + 3),
+      locale: const Locale('ko'),
+    );
+    if (picked != null) {
+      setState(() {
+        _pickedExamDate = picked;
+        _noFixedDate = false;
+      });
+    }
+  }
+
+  Widget _buildDatePickerOptions(ThemeColors colors) {
+    final hasDate = _pickedExamDate != null && !_noFixedDate;
+    final dateLabel = hasDate
+        ? '${_pickedExamDate!.year}년 ${_pickedExamDate!.month}월 ${_pickedExamDate!.day}일'
+        : '날짜 선택하기';
+
+    return Column(
+      children: [
+        Semantics(
+          button: true,
+          identifier: 'onboarding-examdate-pick',
+          label: dateLabel,
+          child: GestureDetector(
+            onTap: _pickExamDate,
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              decoration: BoxDecoration(
+                color: hasDate ? colors.primaryLight : colors.gray0,
+                border: Border.all(
+                  color: hasDate ? colors.primaryNormal : colors.gray900,
+                  width: 1,
+                ),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                dateLabel,
+                style: Typo.bodyRegular(context).copyWith(color: colors.gray900),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Semantics(
+          button: true,
+          identifier: 'onboarding-examdate-no-fixed',
+          label: '정해진 일정 없음',
+          child: GestureDetector(
+            onTap: () => setState(() {
+              _noFixedDate = true;
+              _pickedExamDate = null;
+            }),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              decoration: BoxDecoration(
+                color: _noFixedDate ? colors.primaryLight : colors.gray0,
+                border: Border.all(
+                  color: _noFixedDate ? colors.primaryNormal : colors.gray900,
+                  width: 1,
+                ),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                '정해진 일정 없음',
+                style: Typo.bodyRegular(context).copyWith(color: colors.gray900),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
