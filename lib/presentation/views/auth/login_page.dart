@@ -172,6 +172,7 @@ class _LoginPageState extends State<LoginPage> {
     }
     try {
       final examDate = prefs.getString('pending_onboarding_examDate');
+      final examSessionId = prefs.getString('pending_onboarding_examSessionId');
       final hoursPerWeek = prefs.getInt('pending_onboarding_hoursPerWeek') ?? 7;
       final styleText = prefs.getString('pending_onboarding_style');
       final studyStyle = _mapStyleTextToEnum(styleText);
@@ -179,6 +180,7 @@ class _LoginPageState extends State<LoginPage> {
         'certificateId': certId,
         'hoursPerWeek': hoursPerWeek,
         if (examDate != null) 'examDate': examDate,
+        if (examSessionId != null) 'examSessionId': examSessionId,
         if (studyStyle != null) 'studyStyle': studyStyle,
       };
       await api.post('/curricula/generate', body: body);
@@ -189,6 +191,7 @@ class _LoginPageState extends State<LoginPage> {
     // Clean up pending keys
     await prefs.remove('pending_onboarding_certificateId');
     await prefs.remove('pending_onboarding_examDate');
+    await prefs.remove('pending_onboarding_examSessionId');
     await prefs.remove('pending_onboarding_hoursPerWeek');
     await prefs.remove('pending_onboarding_style');
     if (!mounted) return;

@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:kkeutgong_mobile/data/repositories/catalog/catalog_repository.dart';
 import 'package:kkeutgong_mobile/domain/models/home/certificate.dart';
+import 'package:kkeutgong_mobile/domain/models/home/exam_session.dart';
 import 'package:kkeutgong_mobile/shared/styles/colors.dart';
 import 'package:kkeutgong_mobile/shared/styles/typography.dart';
 import 'package:kkeutgong_mobile/gen/assets.gen.dart';
@@ -23,9 +26,25 @@ class _OnboardingContainerPageState extends State<OnboardingContainerPage> {
   // Stores the selected value for each step index (0=cert, 1=date, 2=hours, 3=style)
   final Map<int, String> _pendingSelections = {};
 
-  // Date picker state for step 1
+  // Date picker state for step 1. The user normally picks a real exam session
+  // (78회 5/23, 79회 8/8, …) from `_examSessions`; the free-form calendar
+  // (`_pickedExamDate`) is only kept as a fallback for the "정해진 일정 없음"
+  // toggle and for certs that don't have any sessions seeded yet.
   DateTime? _pickedExamDate;
   bool _noFixedDate = false;
+  List<ExamSession> _examSessions = const [];
+  String? _selectedSessionId;
+  bool _sessionsLoading = false;
+  String? _sessionsError;
+  String? _sessionsLoadedForCertId;
+
+  ExamSession? get _selectedSession {
+    if (_selectedSessionId == null) return null;
+    for (final s in _examSessions) {
+      if (s.id == _selectedSessionId) return s;
+    }
+    return null;
+  }
 
   // Certificate catalog loaded from /catalog/certificates. Populated lazily so
   // adding a new cert in the backend never requires a mobile release.
@@ -146,10 +165,33 @@ class _OnboardingContainerPageState extends State<OnboardingContainerPage> {
   bool get _currentStepComplete {
     final step = _stepData[_currentStep];
     if (step['isDatePickerStep'] == true) {
-      return _pickedExamDate != null || _noFixedDate;
+      return _selectedSessionId != null || _pickedExamDate != null || _noFixedDate;
     }
     if (step['isNotificationStep'] == true) return true;
     return selectedValue != null;
+  }
+
+  Future<void> _loadExamSessions(String certId) async {
+    if (_sessionsLoadedForCertId == certId && _sessionsError == null) return;
+    setState(() {
+      _sessionsLoading = true;
+      _sessionsError = null;
+    });
+    try {
+      final list = await _catalog.getExamSessions(certId);
+      if (!mounted) return;
+      setState(() {
+        _examSessions = list;
+        _sessionsLoadedForCertId = certId;
+        _sessionsLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _sessionsError = '시험 일정을 불러오지 못했어요.';
+        _sessionsLoading = false;
+      });
+    }
   }
 
   void _nextStep() async {
@@ -158,6 +200,17 @@ class _OnboardingContainerPageState extends State<OnboardingContainerPage> {
         _currentStep++;
         selectedValue = null;
       });
+
+      // Entering the date-picker step → kick off the session fetch for the
+      // cert the user just chose, so the SessionCard list is ready when the
+      // step renders.
+      if (_currentStep == 1) {
+        final certText = _pendingSelections[0];
+        if (certText != null) {
+          final certId = _certIdForName(certText);
+          unawaited(_loadExamSessions(certId));
+        }
+      }
 
       if (_currentStep == 4) {
         await _requestNotificationPermission();
@@ -190,10 +243,22 @@ class _OnboardingContainerPageState extends State<OnboardingContainerPage> {
       final certId = _certIdForName(certText);
       await prefs.setString('pending_onboarding_certificateId', certId);
     }
-    if (!_noFixedDate && _pickedExamDate != null) {
-      await prefs.setString('pending_onboarding_examDate', _pickedExamDate!.toIso8601String());
+    final session = _selectedSession;
+    if (!_noFixedDate && session != null) {
+      await prefs.setString(
+        'pending_onboarding_examDate',
+        session.examDate.toIso8601String(),
+      );
+      await prefs.setString('pending_onboarding_examSessionId', session.id);
+    } else if (!_noFixedDate && _pickedExamDate != null) {
+      await prefs.setString(
+        'pending_onboarding_examDate',
+        _pickedExamDate!.toIso8601String(),
+      );
+      await prefs.remove('pending_onboarding_examSessionId');
     } else {
       await prefs.remove('pending_onboarding_examDate');
+      await prefs.remove('pending_onboarding_examSessionId');
     }
     if (hoursText != null) {
       final hours = _hoursTextToInt[hoursText] ?? 7;
@@ -525,97 +590,72 @@ class _OnboardingContainerPageState extends State<OnboardingContainerPage> {
     );
   }
 
-  // Calendar display month state — initialised lazily on first build
-  DateTime _displayMonth = DateTime(
-    DateTime.now().year,
-    DateTime.now().month,
-  );
-  bool _displayMonthInitialized = false;
-
-  void _ensureDisplayMonthInitialized() {
-    if (!_displayMonthInitialized) {
-      final now = DateTime.now();
-      _displayMonth = DateTime(now.year, now.month);
-      _displayMonthInitialized = true;
-    }
-  }
-
-  void _prevMonth() {
-    setState(() {
-      _displayMonth = DateTime(_displayMonth.year, _displayMonth.month - 1);
-    });
-  }
-
-  void _nextMonth() {
-    setState(() {
-      _displayMonth = DateTime(_displayMonth.year, _displayMonth.month + 1);
-    });
-  }
-
-  void _onDayTap(DateTime date) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    if (date.isBefore(today)) return;
-    setState(() {
-      _pickedExamDate = date;
-      _noFixedDate = false;
-    });
-  }
-
   Widget _buildDatePickerOptions(ThemeColors colors) {
-    _ensureDisplayMonthInitialized();
-
-    final hasDate = _pickedExamDate != null && !_noFixedDate;
-
-    String dateLabel;
-    if (_noFixedDate) {
-      dateLabel = '정해진 일정 없음';
-    } else if (_pickedExamDate == null) {
-      dateLabel = '날짜를 선택해 주세요';
-    } else {
-      dateLabel = '${_pickedExamDate!.year}년 ${_pickedExamDate!.month}월 ${_pickedExamDate!.day}일';
+    if (_sessionsLoading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 60),
+        child: Center(child: CircularProgressIndicator()),
+      );
     }
-
-    String? dDayLabel;
-    if (_pickedExamDate != null && !_noFixedDate) {
-      final now = DateTime.now();
-      final today = DateTime(now.year, now.month, now.day);
-      final target = DateTime(_pickedExamDate!.year, _pickedExamDate!.month, _pickedExamDate!.day);
-      final diff = target.difference(today).inDays;
-      dDayLabel = diff == 0 ? 'D-Day' : (diff > 0 ? 'D-$diff' : 'D+${-diff}');
+    if (_sessionsError != null) {
+      final certText = _pendingSelections[0];
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 32),
+        child: Column(
+          children: [
+            Text(
+              _sessionsError!,
+              textAlign: TextAlign.center,
+              style: Typo.bodyRegular(context, color: colors.gray500),
+            ),
+            const SizedBox(height: 12),
+            TextButton(
+              onPressed: certText == null
+                  ? null
+                  : () => _loadExamSessions(_certIdForName(certText)),
+              child: Text(
+                '다시 시도',
+                style: Typo.bodyRegular(context, color: colors.primaryNormal),
+              ),
+            ),
+          ],
+        ),
+      );
     }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // ── 선택 날짜 + D-day 배너 ──
-        _ContainerSelectedDateBanner(
-          label: dateLabel,
-          dDay: dDayLabel,
-          hasSelection: hasDate || _noFixedDate,
-          colors: colors,
-        ),
-
-        const SizedBox(height: 16),
-
-        // ── 인라인 캘린더 ──
-        AnimatedOpacity(
-          opacity: _noFixedDate ? 0.35 : 1.0,
-          duration: const Duration(milliseconds: 200),
-          child: IgnorePointer(
-            ignoring: _noFixedDate,
-            child: _ContainerInlineCalendar(
-              displayMonth: _displayMonth,
-              selectedDate: _pickedExamDate,
-              onDayTap: _onDayTap,
-              onPrevMonth: _prevMonth,
-              onNextMonth: _nextMonth,
-              colors: colors,
+        if (_examSessions.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+            decoration: BoxDecoration(
+              color: colors.gray20,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: colors.gray30),
             ),
-          ),
-        ),
-
-        const SizedBox(height: 16),
+            child: Text(
+              '아직 등록된 시험 일정이 없어요.\n‘정해진 일정 없음’으로 시작해 볼까요?',
+              style: Typo.bodyRegular(context, color: colors.gray500),
+            ),
+          )
+        else
+          ..._examSessions.map((s) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _ContainerSessionCard(
+                  session: s,
+                  isSelected: _selectedSessionId == s.id && !_noFixedDate,
+                  dDay: _formatDDay(s.examDate),
+                  colors: colors,
+                  onTap: () => setState(() {
+                    _selectedSessionId = s.id;
+                    _pickedExamDate = null;
+                    _noFixedDate = false;
+                  }),
+                ),
+              )),
+        const SizedBox(height: 8),
 
         // ── 정해진 일정 없음 ──
         Semantics(
@@ -627,281 +667,25 @@ class _OnboardingContainerPageState extends State<OnboardingContainerPage> {
             colors: colors,
             onTap: () => setState(() {
               _noFixedDate = !_noFixedDate;
-              if (_noFixedDate) _pickedExamDate = null;
+              if (_noFixedDate) {
+                _selectedSessionId = null;
+                _pickedExamDate = null;
+              }
             }),
           ),
         ),
       ],
     );
   }
-}
 
-// ─────────────────────────────────────────────
-// Selected Date Banner (container-local copy)
-// ─────────────────────────────────────────────
-class _ContainerSelectedDateBanner extends StatelessWidget {
-  final String label;
-  final String? dDay;
-  final bool hasSelection;
-  final ThemeColors colors;
-
-  const _ContainerSelectedDateBanner({
-    required this.label,
-    required this.dDay,
-    required this.hasSelection,
-    required this.colors,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 250),
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-      decoration: BoxDecoration(
-        color: hasSelection ? colors.primaryLight : colors.gray20,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: hasSelection ? colors.primaryNormal : colors.gray30,
-          width: hasSelection ? 1.5 : 1,
-        ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Expanded(
-            child: Text(
-              label,
-              style: TextStyle(
-                fontFamily: 'SeoulAlrim',
-                fontSize: 20,
-                fontWeight: FontWeight.w800,
-                height: 1.3,
-                letterSpacing: -0.4,
-                color: hasSelection ? colors.primaryNormal : colors.gray100,
-              ),
-            ),
-          ),
-          if (dDay != null) ...[
-            const SizedBox(width: 10),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: colors.primaryNormal,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                dDay!,
-                style: TextStyle(
-                  fontFamily: 'Pretendard',
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: -0.2,
-                  color: colors.gray0,
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────
-// Inline Calendar (container-local copy)
-// ─────────────────────────────────────────────
-class _ContainerInlineCalendar extends StatelessWidget {
-  final DateTime displayMonth;
-  final DateTime? selectedDate;
-  final void Function(DateTime) onDayTap;
-  final VoidCallback onPrevMonth;
-  final VoidCallback onNextMonth;
-  final ThemeColors colors;
-
-  const _ContainerInlineCalendar({
-    required this.displayMonth,
-    required this.selectedDate,
-    required this.onDayTap,
-    required this.onPrevMonth,
-    required this.onNextMonth,
-    required this.colors,
-  });
-
-  static const _weekdays = ['일', '월', '화', '수', '목', '금', '토'];
-  static const _korMonths = [
-    '', '1월', '2월', '3월', '4월', '5월', '6월',
-    '7월', '8월', '9월', '10월', '11월', '12월',
-  ];
-
-  List<DateTime?> _buildCalendarDays() {
-    final firstDay = DateTime(displayMonth.year, displayMonth.month, 1);
-    final startWeekday = firstDay.weekday % 7; // 0=Sun
-    final daysInMonth =
-        DateUtils.getDaysInMonth(displayMonth.year, displayMonth.month);
-    final cells = <DateTime?>[];
-    for (int i = 0; i < startWeekday; i++) { cells.add(null); }
-    for (int d = 1; d <= daysInMonth; d++) {
-      cells.add(DateTime(displayMonth.year, displayMonth.month, d));
-    }
-    while (cells.length % 7 != 0) { cells.add(null); }
-    return cells;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final cells = _buildCalendarDays();
+  String _formatDDay(DateTime date) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-
-    return Container(
-      decoration: BoxDecoration(
-        color: colors.gray0,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colors.gray30, width: 1),
-      ),
-      padding: const EdgeInsets.fromLTRB(4, 16, 4, 16),
-      child: Column(
-        children: [
-          // Month nav header
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                IconButton(
-                  onPressed: onPrevMonth,
-                  icon: Icon(Icons.chevron_left, color: colors.gray400, size: 22),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                ),
-                Text(
-                  '${displayMonth.year}년 ${_korMonths[displayMonth.month]}',
-                  style: TextStyle(
-                    fontFamily: 'Pretendard',
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.32,
-                    color: colors.gray900,
-                  ),
-                ),
-                IconButton(
-                  onPressed: onNextMonth,
-                  icon: Icon(Icons.chevron_right, color: colors.gray400, size: 22),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 10),
-          // Weekday labels
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: Row(
-              children: _weekdays.map((w) {
-                final isSun = w == '일';
-                final isSat = w == '토';
-                return Expanded(
-                  child: Center(
-                    child: Text(
-                      w,
-                      style: TextStyle(
-                        fontFamily: 'Pretendard',
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: isSun
-                            ? const Color(0xffFF4035).withValues(alpha: 0.7)
-                            : isSat
-                                ? colors.primaryNormal.withValues(alpha: 0.7)
-                                : colors.gray300,
-                        letterSpacing: -0.2,
-                      ),
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-          const SizedBox(height: 6),
-          // Day grid
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 7,
-                childAspectRatio: 1,
-              ),
-              itemCount: cells.length,
-              itemBuilder: (_, index) {
-                final date = cells[index];
-                if (date == null) return const SizedBox.shrink();
-
-                final isToday = date == today;
-                final isSelected = selectedDate != null &&
-                    date.year == selectedDate!.year &&
-                    date.month == selectedDate!.month &&
-                    date.day == selectedDate!.day;
-                final isPast = date.isBefore(today);
-                final isSunday = date.weekday == DateTime.sunday;
-                final isSaturday = date.weekday == DateTime.saturday;
-
-                Color dayTextColor;
-                if (isSelected) {
-                  dayTextColor = colors.gray0;
-                } else if (isPast) {
-                  dayTextColor = colors.gray50;
-                } else if (isSunday) {
-                  dayTextColor = const Color(0xffFF4035).withValues(alpha: 0.85);
-                } else if (isSaturday) {
-                  dayTextColor = colors.primaryNormal.withValues(alpha: 0.85);
-                } else {
-                  dayTextColor = colors.gray900;
-                }
-
-                return GestureDetector(
-                  onTap: isPast ? null : () => onDayTap(date),
-                  child: Center(
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? colors.primaryNormal
-                            : isToday
-                                ? colors.primaryLight
-                                : Colors.transparent,
-                        shape: BoxShape.circle,
-                        border: isToday && !isSelected
-                            ? Border.all(color: colors.primaryNormal, width: 1.5)
-                            : null,
-                      ),
-                      child: Center(
-                        child: Text(
-                          '${date.day}',
-                          style: TextStyle(
-                            fontFamily: 'Pretendard',
-                            fontSize: 14,
-                            fontWeight: isSelected || isToday
-                                ? FontWeight.w700
-                                : FontWeight.w500,
-                            color: dayTextColor,
-                            letterSpacing: -0.2,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
+    final target = DateTime(date.year, date.month, date.day);
+    final diff = target.difference(today).inDays;
+    if (diff == 0) return 'D-Day';
+    if (diff > 0) return 'D-$diff';
+    return 'D+${-diff}';
   }
 }
 
@@ -964,6 +748,146 @@ class _ContainerNoScheduleToggle extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+// Session Card (real-exam picker)
+// ─────────────────────────────────────────────
+class _ContainerSessionCard extends StatelessWidget {
+  final ExamSession session;
+  final bool isSelected;
+  final String dDay;
+  final ThemeColors colors;
+  final VoidCallback onTap;
+
+  const _ContainerSessionCard({
+    required this.session,
+    required this.isSelected,
+    required this.dDay,
+    required this.colors,
+    required this.onTap,
+  });
+
+  static const _weekdayKor = ['월', '화', '수', '목', '금', '토', '일'];
+
+  String get _dateLabel {
+    final d = session.examDate;
+    final w = _weekdayKor[d.weekday - 1];
+    return '${d.year}년 ${d.month}월 ${d.day}일 ($w)';
+  }
+
+  String get _titleLabel {
+    final round = session.roundNumber;
+    if (round != null) return '$round회 · ${session.examType}';
+    return session.examType;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      identifier: 'onboarding-session-${session.id}',
+      label: '$_titleLabel $_dateLabel',
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          decoration: BoxDecoration(
+            color: isSelected ? colors.primaryLight : colors.gray0,
+            border: Border.all(
+              color: isSelected ? colors.primaryNormal : colors.gray30,
+              width: isSelected ? 1.5 : 1,
+            ),
+            borderRadius: BorderRadius.circular(14),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: colors.primaryNormal.withValues(alpha: 0.10),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ]
+                : [],
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          _titleLabel,
+                          style: Typo.labelRegular(context,
+                              color: isSelected
+                                  ? colors.primaryNormal
+                                  : colors.gray500),
+                        ),
+                        if (session.isEstimated) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: colors.gray20,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              '예정',
+                              style: TextStyle(
+                                fontFamily: 'Pretendard',
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: colors.gray400,
+                                letterSpacing: -0.2,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _dateLabel,
+                      style: TextStyle(
+                        fontFamily: 'SeoulAlrim',
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                        height: 1.3,
+                        letterSpacing: -0.3,
+                        color: colors.gray900,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: isSelected ? colors.primaryNormal : colors.gray100,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  dDay,
+                  style: TextStyle(
+                    fontFamily: 'Pretendard',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.2,
+                    color: colors.gray0,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
