@@ -191,14 +191,25 @@ class _LoginPageState extends State<LoginPage> {
   Future<void> _applyPendingOnboarding(
       SharedPreferences prefs, String certId) async {
     final api = ApiClient();
+    bool registered = false;
     try {
       // Register certificate for this user first. Backend marks the first
-      // registered cert as active automatically.
+      // registered cert as active automatically. Don't swallow the error
+      // wholesale — if this silently fails the home tab ends up with a
+      // blank cert rail and no path back to onboarding.
       await api.post('/users/me/certificates', body: {'certificateId': certId});
-    } catch (_) {
-      // Best-effort — proceed even if already registered
+      registered = true;
+    } catch (e) {
+      debugPrint('cert registration failed: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('자격증 등록에 실패했어요: $e')),
+        );
+      }
     }
-    await _setActiveCertificate(certId);
+    if (registered) {
+      await _setActiveCertificate(certId);
+    }
     try {
       final examDate = prefs.getString('pending_onboarding_examDate');
       final examSessionId = prefs.getString('pending_onboarding_examSessionId');
