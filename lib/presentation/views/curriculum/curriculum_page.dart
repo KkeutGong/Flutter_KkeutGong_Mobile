@@ -101,6 +101,7 @@ class _CurriculumPageState extends State<CurriculumPage> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       _buildSummarySection(context, colors, data, scale, isTablet, horizontalPadding),
+                      _buildWeaknessSnapshot(context, colors, data, scale, horizontalPadding),
                       _buildDayTabs(context, colors, scale, horizontalPadding),
                       _buildTodayPlanSection(context, colors, scale, horizontalPadding),
                       if (sectionWidgets.isNotEmpty) ...[
@@ -318,6 +319,128 @@ class _CurriculumPageState extends State<CurriculumPage> {
           ),
         ],
       ),
+    );
+  }
+
+  /// "약점 한눈에" snapshot: per-subject weakness bars from the curriculum
+  /// plan's weaknessSnapshot. Renders only when we have weakness signal,
+  /// so brand-new accounts don't see a wall of zero bars. Visual language
+  /// matches the home tab's coach banner — same white card + gray70 border
+  /// + 18 corner radius — so the user feels one continuous design.
+  Widget _buildWeaknessSnapshot(
+    BuildContext context,
+    ThemeColors colors,
+    HomeData data,
+    double scale,
+    double horizontalPadding,
+  ) {
+    final weakness = _viewModel.myCurriculum?.plan.weaknessSnapshot;
+    if (weakness == null || weakness.isEmpty) return const SizedBox.shrink();
+    final subjects = data.subjects;
+    if (subjects.isEmpty) return const SizedBox.shrink();
+    final entries = subjects
+        .map((s) => (
+              id: s.id,
+              name: s.name,
+              weakness: (weakness[s.id] ?? 0).clamp(0.0, 1.0),
+            ))
+        .where((e) => e.weakness > 0)
+        .toList()
+      ..sort((a, b) => b.weakness.compareTo(a.weakness));
+    if (entries.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(horizontalPadding, 16 * scale, horizontalPadding, 0),
+      child: Container(
+        padding: EdgeInsets.all(16 * scale),
+        decoration: BoxDecoration(
+          color: colors.gray0,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: colors.gray70),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.tune, size: 18, color: colors.primaryNormal),
+                const SizedBox(width: 8),
+                Text(
+                  '과목별 약점',
+                  style: TextStyle(
+                    fontFamily: 'SeoulAlrim',
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: colors.gray900,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '약점 비중이 높을수록 plan에서 더 많이 잡혀요',
+              style: Typo.labelRegular(context, color: colors.gray500),
+            ),
+            SizedBox(height: 14 * scale),
+            ...entries.map((e) => Padding(
+                  padding: EdgeInsets.only(bottom: 10 * scale),
+                  child: _buildWeaknessRow(context, colors, e.name, e.weakness),
+                )),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWeaknessRow(
+    BuildContext context,
+    ThemeColors colors,
+    String name,
+    double weakness,
+  ) {
+    final percent = (weakness * 100).round();
+    final isHigh = weakness >= 0.6;
+    final isMid = weakness >= 0.3 && !isHigh;
+    final accent = isHigh
+        ? const Color(0xFFE85C5C)
+        : isMid
+            ? const Color(0xFFFFB266)
+            : colors.primaryNormal;
+    return Row(
+      children: [
+        SizedBox(
+          width: 88,
+          child: Text(
+            name,
+            overflow: TextOverflow.ellipsis,
+            style: Typo.bodyRegular(context, color: colors.gray700),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(99),
+            child: LinearProgressIndicator(
+              value: weakness,
+              minHeight: 6,
+              backgroundColor: colors.gray30,
+              valueColor: AlwaysStoppedAnimation(accent),
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Text(
+          '$percent%',
+          style: TextStyle(
+            fontFamily: 'Pretendard',
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: accent,
+            letterSpacing: -0.2,
+          ),
+        ),
+      ],
     );
   }
 
