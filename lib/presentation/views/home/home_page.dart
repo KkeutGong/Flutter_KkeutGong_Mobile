@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:kkeutgong_mobile/core/notifications/notification_service.dart';
 import 'package:kkeutgong_mobile/core/routes/app_routes.dart';
 import 'package:kkeutgong_mobile/domain/models/study/today_plan.dart';
 import 'package:kkeutgong_mobile/gen/assets.gen.dart';
@@ -18,8 +20,9 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   late final HomeViewModel _viewModel;
+  String? _milestonePayload;
 
   @override
   void initState() {
@@ -27,10 +30,68 @@ class _HomePageState extends State<HomePage> {
     _viewModel = HomeViewModel(null);
     _viewModel.loadHomeData();
     _viewModel.addListener(_onViewModelChanged);
+    WidgetsBinding.instance.addObserver(this);
+    _checkPendingMilestone();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Re-check on resume so a notification tapped while the app was in the
+    // background still pops the confetti banner the next time the user
+    // looks at the home tab.
+    if (state == AppLifecycleState.resumed) {
+      _checkPendingMilestone();
+    }
+  }
+
+  Future<void> _checkPendingMilestone() async {
+    final prefs = await SharedPreferences.getInstance();
+    final payload = prefs.getString(kPendingMilestoneKey);
+    if (payload == null || payload.isEmpty) return;
+    await prefs.remove(kPendingMilestoneKey);
+    if (!mounted) return;
+    setState(() => _milestonePayload = payload);
+    // Auto-dismiss after a few seconds so it doesn't linger.
+    Future.delayed(const Duration(seconds: 6), () {
+      if (!mounted || _milestonePayload != payload) return;
+      setState(() => _milestonePayload = null);
+    });
+  }
+
+  ({String title, String body, List<Color> gradient}) _milestoneCopy(String payload) {
+    if (payload.startsWith('streak:')) {
+      final n = payload.split(':').last;
+      return (
+        title: '🔥 $n일 연속 학습',
+        body: '꾸준한 페이스가 합격을 만듭니다.',
+        gradient: const [Color(0xFFFF8E53), Color(0xFFFE6B8B)],
+      );
+    }
+    if (payload.startsWith('pass:')) {
+      final n = payload.split(':').last;
+      return (
+        title: '✨ 합격 가능성 $n% 돌파',
+        body: '같은 페이스로 시험일까지 끌고 가요.',
+        gradient: const [Color(0xFF6FCF97), Color(0xFF27AE60)],
+      );
+    }
+    if (payload.startsWith('late')) {
+      return (
+        title: '🌙 오늘 학습이 남아 있어요',
+        body: '5분만 보고 가도 내일이 한결 가벼워요.',
+        gradient: const [Color(0xFF6E8EFB), Color(0xFFA777E3)],
+      );
+    }
+    return (
+      title: '🎉 잠깐의 축하!',
+      body: '오늘도 잘하고 있어요.',
+      gradient: const [Color(0xFFFE6B8B), Color(0xFFFF8E53)],
+    );
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _viewModel.removeListener(_onViewModelChanged);
     _viewModel.dispose();
     super.dispose();
@@ -105,6 +166,22 @@ class _HomePageState extends State<HomePage> {
               ],
             ),
           ),
+          if (_milestonePayload != null)
+            Positioned(
+              left: 0,
+              right: 0,
+              top: 0,
+              child: SafeArea(
+                bottom: false,
+                child: Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: screenWidth * 0.06,
+                    vertical: 8,
+                  ),
+                  child: _buildMilestoneBanner(context, colors, _milestonePayload!),
+                ),
+              ),
+            ),
           if (_viewModel.isCertificateDropdownOpen)
             GestureDetector(
               onTap: _viewModel.closeCertificateDropdown,
@@ -123,6 +200,71 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  /// Top sticky banner that fires after a milestone notification tap. Auto-
+  /// dismisses after 6s (set in initState) so it doesn't crowd the hero,
+  /// but the user can also X-close it. Visual: short gradient pill matching
+  /// the milestone's vibe — orange for streak, green for pass-meter,
+  /// blue/purple for late-day reminders.
+  Widget _buildMilestoneBanner(BuildContext context, ThemeColors colors, String payload) {
+    final copy = _milestoneCopy(payload);
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: copy.gradient,
+          ),
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            BoxShadow(
+              color: copy.gradient.first.withValues(alpha: 0.32),
+              offset: const Offset(0, 6),
+              blurRadius: 18,
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    copy.title,
+                    style: TextStyle(
+                      fontFamily: 'SeoulAlrim',
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      color: colors.gray0,
+                      letterSpacing: -0.3,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    copy.body,
+                    style: TextStyle(
+                      fontFamily: 'Pretendard',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: colors.gray0.withValues(alpha: 0.92),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              icon: Icon(Icons.close, size: 20, color: colors.gray0),
+              onPressed: () => setState(() => _milestonePayload = null),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -190,6 +190,7 @@ class HomeViewModel extends ChangeNotifier {
         id: 2001,
         title: '🔥 ${plan.streak}일 연속 학습!',
         body: '오늘도 잊지 않고 따라왔어요. 페이스를 이어가요.',
+        payload: 'streak:${plan.streak}',
       );
     }
     await prefs.setInt(kStreakKey, plan.streak);
@@ -200,6 +201,7 @@ class HomeViewModel extends ChangeNotifier {
         id: 2002,
         title: '✨ 합격 가능성 70% 돌파!',
         body: '${plan.passLikelihood}%까지 올라왔어요. 같은 페이스로 시험일까지!',
+        payload: 'pass:${plan.passLikelihood}',
       );
     }
     await prefs.setInt(kPassKey, plan.passLikelihood);
@@ -215,6 +217,7 @@ class HomeViewModel extends ChangeNotifier {
           id: 2003,
           title: '🌙 오늘 학습이 남아 있어요',
           body: '내일 시작 부담을 덜기 위해 5분만 보고 갈까요?',
+          payload: 'late:1',
         );
         await prefs.setString(kLateKey, todayKey);
       }

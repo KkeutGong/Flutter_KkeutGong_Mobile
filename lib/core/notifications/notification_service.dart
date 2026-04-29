@@ -4,8 +4,13 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
+
+/// Shared key for the milestone payload that the home tab reads on mount
+/// to show a confetti banner explaining why the notification fired.
+const kPendingMilestoneKey = 'pending_milestone_payload';
 
 /// Scaffold for local push notifications.
 ///
@@ -40,7 +45,29 @@ class NotificationService {
       android: androidInit,
       iOS: iosInit,
     );
-    await _plugin.initialize(initSettings);
+    await _plugin.initialize(
+      initSettings,
+      onDidReceiveNotificationResponse: _onTap,
+    );
+    // App launch via notification tap (cold start) — pick up the payload
+    // that brought us here so the home tab can render its confetti banner
+    // even on the first frame.
+    final launch = await _plugin.getNotificationAppLaunchDetails();
+    final coldPayload = launch?.notificationResponse?.payload;
+    if (coldPayload != null && coldPayload.isNotEmpty) {
+      await _persistPayload(coldPayload);
+    }
+  }
+
+  static Future<void> _onTap(NotificationResponse response) async {
+    final payload = response.payload;
+    if (payload == null || payload.isEmpty) return;
+    await _persistPayload(payload);
+  }
+
+  static Future<void> _persistPayload(String payload) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(kPendingMilestoneKey, payload);
   }
 
   Future<bool> requestPermission() async {
