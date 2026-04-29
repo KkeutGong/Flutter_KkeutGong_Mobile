@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:kkeutgong_mobile/core/notifications/notification_service.dart';
 import 'package:kkeutgong_mobile/data/repositories/home/home_repository.dart';
 import 'package:kkeutgong_mobile/data/repositories/study/today_repository.dart';
 import 'package:kkeutgong_mobile/domain/models/home/certificate.dart';
@@ -61,6 +63,14 @@ class HomeViewModel extends ChangeNotifier {
       // still lets the home tab render the carousel + cert info.
       try {
         _todayPlan = await _todayRepository.getToday(forceRefresh: forceRefresh);
+        // Best-effort: fire any milestone notifications the new plan
+        // unlocked (streak, pass-meter, late-day reminder). Failures here
+        // never bubble — milestones are nice-to-have on top of the screen.
+        try {
+          await _maybeFireMilestones(_todayPlan!);
+        } catch (_) {
+          // ignore
+        }
       } catch (_) {
         _todayPlan = null;
       }
@@ -159,5 +169,55 @@ class HomeViewModel extends ChangeNotifier {
   }
 
   void onStartPressed() {
+  }
+
+  /// Fires milestone push notifications when /study/today crosses a
+  /// threshold the user hasn't seen yet. Three triggers, all idempotent:
+  ///   - streak hits 3 days for the first time
+  ///   - pass-likelihood crosses 70 going up
+  ///   - it's past 21:00 KST and today's plan still has unfinished work
+  /// Persists last-seen values in SharedPreferences so the same milestone
+  /// doesn't re-fire on every refresh.
+  Future<void> _maybeFireMilestones(TodayPlan plan) async {
+    final prefs = await SharedPreferences.getInstance();
+    const kStreakKey = 'milestone_last_streak';
+    const kPassKey = 'milestone_last_pass';
+    const kLateKey = 'milestone_late_fired_date';
+
+    final lastStreak = prefs.getInt(kStreakKey) ?? 0;
+    if (plan.streak >= 3 && lastStreak < 3) {
+      await NotificationService().showInstant(
+        id: 2001,
+        title: '🔥 ${plan.streak}일 연속 학습!',
+        body: '오늘도 잊지 않고 따라왔어요. 페이스를 이어가요.',
+      );
+    }
+    await prefs.setInt(kStreakKey, plan.streak);
+
+    final lastPass = prefs.getInt(kPassKey) ?? 0;
+    if (plan.passLikelihood >= 70 && lastPass < 70) {
+      await NotificationService().showInstant(
+        id: 2002,
+        title: '✨ 합격 가능성 70% 돌파!',
+        body: '${plan.passLikelihood}%까지 올라왔어요. 같은 페이스로 시험일까지!',
+      );
+    }
+    await prefs.setInt(kPassKey, plan.passLikelihood);
+
+    final now = DateTime.now();
+    final hasUnfinished =
+        plan.tasks.any((t) => t.type != TodayTaskType.mockExam && !t.isComplete);
+    if (now.hour >= 21 && hasUnfinished) {
+      final todayKey = '${now.year}-${now.month}-${now.day}';
+      final lastFired = prefs.getString(kLateKey);
+      if (lastFired != todayKey) {
+        await NotificationService().showInstant(
+          id: 2003,
+          title: '🌙 오늘 학습이 남아 있어요',
+          body: '내일 시작 부담을 덜기 위해 5분만 보고 갈까요?',
+        );
+        await prefs.setString(kLateKey, todayKey);
+      }
+    }
   }
 }

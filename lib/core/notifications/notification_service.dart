@@ -96,6 +96,29 @@ class NotificationService {
   Future<void> cancelAll() async {
     await _plugin.cancelAll();
   }
+
+  /// Fire a one-shot milestone notification immediately. Used for
+  /// streak / pass-meter / mission-incomplete celebrations triggered
+  /// from the home view-model after a /study/today refresh.
+  Future<void> showInstant({
+    required int id,
+    required String title,
+    required String body,
+    String? payload,
+  }) async {
+    const androidDetails = AndroidNotificationDetails(
+      _channelId,
+      _channelName,
+      importance: Importance.high,
+      priority: Priority.high,
+    );
+    const iosDetails = DarwinNotificationDetails();
+    const details = NotificationDetails(
+      android: androidDetails,
+      iOS: iosDetails,
+    );
+    await _plugin.show(id, title, body, details, payload: payload);
+  }
 }
 
 // ── TODO: FCM / APNs remote push setup ──────────────────────────────────────
