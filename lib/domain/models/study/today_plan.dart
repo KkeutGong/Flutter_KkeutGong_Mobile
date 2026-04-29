@@ -82,6 +82,36 @@ class PlanAdaptation {
       );
 }
 
+class TodayRecap {
+  final String dateLabel;
+  final int planned;
+  final int completed;
+
+  const TodayRecap({
+    required this.dateLabel,
+    required this.planned,
+    required this.completed,
+  });
+
+  factory TodayRecap.fromJson(Map<String, dynamic> json) => TodayRecap(
+        dateLabel: (json['dateLabel'] as String?) ?? '',
+        planned: (json['planned'] as num?)?.toInt() ?? 0,
+        completed: (json['completed'] as num?)?.toInt() ?? 0,
+      );
+}
+
+class TodayPreview {
+  final String dateLabel;
+  final int planned;
+
+  const TodayPreview({required this.dateLabel, required this.planned});
+
+  factory TodayPreview.fromJson(Map<String, dynamic> json) => TodayPreview(
+        dateLabel: (json['dateLabel'] as String?) ?? '',
+        planned: (json['planned'] as num?)?.toInt() ?? 0,
+      );
+}
+
 class TodayPlan {
   final List<TodayTask> tasks;
   /// Adaptive ordering — same set as `tasks` but sorted (mock first, then
@@ -95,6 +125,9 @@ class TodayPlan {
   final CoachMessage coachMessage;
   final PlanAdaptation? adaptation;
   final int? dDay;
+  final TodayRecap? yesterday;
+  final TodayPreview? tomorrow;
+  final int streak;
 
   const TodayPlan({
     required this.tasks,
@@ -106,6 +139,9 @@ class TodayPlan {
     required this.coachMessage,
     required this.adaptation,
     required this.dDay,
+    required this.yesterday,
+    required this.tomorrow,
+    required this.streak,
   });
 
   bool get isEmpty => tasks.isEmpty;
@@ -133,6 +169,13 @@ class TodayPlan {
           ? PlanAdaptation.fromJson(json['adaptation'] as Map<String, dynamic>)
           : null,
       dDay: (json['dDay'] as num?)?.toInt(),
+      yesterday: json['yesterday'] is Map<String, dynamic>
+          ? TodayRecap.fromJson(json['yesterday'] as Map<String, dynamic>)
+          : null,
+      tomorrow: json['tomorrow'] is Map<String, dynamic>
+          ? TodayPreview.fromJson(json['tomorrow'] as Map<String, dynamic>)
+          : null,
+      streak: (json['streak'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -146,5 +189,8 @@ class TodayPlan {
         coachMessage: CoachMessage.empty,
         adaptation: null,
         dDay: null,
+        yesterday: null,
+        tomorrow: null,
+        streak: 0,
       );
 }

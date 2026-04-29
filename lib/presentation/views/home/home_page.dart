@@ -95,6 +95,8 @@ class _HomePageState extends State<HomePage> {
                           ],
                           SizedBox(height: screenHeight * 0.022),
                           _buildTodayLauncher(context, colors, homeData, screenWidth),
+                          SizedBox(height: screenHeight * 0.024),
+                          _buildContinuityFooter(context, colors, screenWidth),
                         ],
                       ),
                     ),
@@ -394,6 +396,110 @@ class _HomePageState extends State<HomePage> {
           ],
         ),
       ),
+    );
+  }
+
+  /// Footer card under the launcher: yesterday recap, tomorrow preview,
+  /// streak chip. Closes the daily-loop frame so the user feels the app is
+  /// a chain ("어제 5/8 했고, 오늘 7개, 내일 6개 — 4일째 이어가는 중").
+  Widget _buildContinuityFooter(
+    BuildContext context,
+    ThemeColors colors,
+    double screenWidth,
+  ) {
+    final hp = screenWidth * 0.06;
+    final today = _viewModel.todayPlan;
+    if (today == null) return const SizedBox.shrink();
+    final y = today.yesterday;
+    final t = today.tomorrow;
+    final streak = today.streak;
+
+    if (y == null && t == null && streak == 0) return const SizedBox.shrink();
+
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: hp),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+        decoration: BoxDecoration(
+          color: colors.gray0,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: colors.gray70),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (y != null)
+              _buildContinuityRow(
+                context,
+                colors,
+                label: '어제',
+                value: y.planned > 0
+                    ? '${y.dateLabel} · ${y.completed}/${y.planned} 완료'
+                    : '${y.dateLabel} · 학습 없음',
+                icon: Icons.history,
+              ),
+            if (y != null && t != null)
+              Container(height: 1, color: colors.gray20, margin: const EdgeInsets.symmetric(vertical: 8)),
+            if (t != null)
+              _buildContinuityRow(
+                context,
+                colors,
+                label: '내일',
+                value: '${t.dateLabel} · ${t.planned}개 예정',
+                icon: Icons.schedule,
+              ),
+            if ((y != null || t != null) && streak > 0)
+              Container(height: 1, color: colors.gray20, margin: const EdgeInsets.symmetric(vertical: 8)),
+            if (streak > 0)
+              _buildContinuityRow(
+                context,
+                colors,
+                label: '연속',
+                value: '$streak일째 이어가는 중',
+                icon: Icons.local_fire_department_outlined,
+                accent: streak >= 3,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildContinuityRow(
+    BuildContext context,
+    ThemeColors colors, {
+    required String label,
+    required String value,
+    required IconData icon,
+    bool accent = false,
+  }) {
+    final color = accent ? colors.primaryNormal : colors.gray700;
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: color),
+        const SizedBox(width: 10),
+        Text(
+          label,
+          style: TextStyle(
+            fontFamily: 'Pretendard',
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: colors.gray500,
+            letterSpacing: -0.2,
+          ),
+        ),
+        const Spacer(),
+        Text(
+          value,
+          style: TextStyle(
+            fontFamily: 'Pretendard',
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: color,
+            letterSpacing: -0.2,
+          ),
+        ),
+      ],
     );
   }
 
