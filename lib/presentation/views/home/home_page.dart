@@ -6,6 +6,7 @@ import 'package:kkeutgong_mobile/core/routes/app_routes.dart';
 import 'package:kkeutgong_mobile/domain/models/study/today_plan.dart';
 import 'package:kkeutgong_mobile/gen/assets.gen.dart';
 import 'package:kkeutgong_mobile/presentation/widgets/home/pass_meter.dart';
+import 'package:kkeutgong_mobile/presentation/widgets/home/pass_trend_chart.dart';
 import 'package:kkeutgong_mobile/presentation/viewmodels/home_viewmodel.dart';
 import 'package:kkeutgong_mobile/presentation/views/home/home_page_skeleton.dart';
 import 'package:kkeutgong_mobile/presentation/views/home/streak_bottom_sheet.dart';
@@ -403,7 +404,20 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               style: Typo.bodyRegular(context, color: colors.gray700)
                   .copyWith(height: 1.5),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 18),
+            Text(
+              '추이 (최근 30일)',
+              style: TextStyle(
+                fontFamily: 'SeoulAlrim',
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+                color: colors.gray700,
+                letterSpacing: -0.2,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const PassTrendChart(),
+            const SizedBox(height: 18),
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
