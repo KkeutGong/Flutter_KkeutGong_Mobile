@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:kkeutgong_mobile/core/routes/app_routes.dart';
 import 'package:kkeutgong_mobile/domain/models/home/study_mode.dart';
+import 'package:kkeutgong_mobile/domain/models/study/today_plan.dart';
 import 'package:kkeutgong_mobile/gen/assets.gen.dart';
 import 'package:kkeutgong_mobile/presentation/viewmodels/home_viewmodel.dart';
 import 'package:kkeutgong_mobile/presentation/views/home/home_page_skeleton.dart';
@@ -42,54 +43,6 @@ class _HomePageState extends State<HomePage> {
     setState(() {});
   }
 
-  Future<void> _onStartStudy() async {
-    // Use `effectiveMode` so finishing 개념정리 doesn't strand the user on a
-    // "완료" button — the CTA naturally pivots to 기출문제 (and so on) once
-    // the current step is done.
-    final targetMode = _viewModel.effectiveMode;
-    final targetIndex = _viewModel.studyModes.indexOf(targetMode);
-    if (targetIndex >= 0 && targetIndex != _viewModel.currentModeIndex) {
-      _viewModel.setCurrentMode(targetIndex);
-      if (_pageController.hasClients) {
-        _pageController.animateToPage(
-          targetIndex,
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.easeInOut,
-        );
-      }
-    }
-
-    final hd = _viewModel.homeData;
-    final subjectName = (hd == null || hd.subjects.isEmpty)
-        ? ''
-        : (hd.subjects.firstWhere(
-              (s) => !s.isCompleted,
-              orElse: () => hd.subjects.first,
-            ).name);
-
-    Future<dynamic>? nav;
-    switch (targetMode) {
-      case StudyMode.concept:
-        nav = Get.toNamed(AppRoutes.conceptStudy, arguments: {'subjectName': subjectName});
-        break;
-      case StudyMode.practice:
-        nav = Get.toNamed(AppRoutes.practiceStudy, arguments: {'subjectName': subjectName});
-        break;
-      case StudyMode.review:
-        // Pull the time limit from the active cert so 컴활 2급(90), 한국사(80) etc.
-        // get their real exam clock instead of a 정보처리기사-shaped 150-min default.
-        final minutes = hd?.currentCertificate.mockExamMinutes ?? 90;
-        nav = Get.toNamed(AppRoutes.mockExam, arguments: {
-          'examName': subjectName,
-          'timeLimitMinutes': minutes,
-        });
-        break;
-    }
-    if (nav != null) {
-      await nav;
-      await _viewModel.refresh();
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -128,14 +81,17 @@ class _HomePageState extends State<HomePage> {
               children: [
                 _buildAppBar(context, colors, homeData, screenWidth),
                 Expanded(
-                  child: Column(
-                    children: [
-                      SizedBox(height: screenHeight * 0.049),
-                      _buildStudyProgress(context, colors, homeData, screenWidth, screenHeight),
-                      SizedBox(height: screenHeight * 0.063),
-                      _buildCurriculumSection(context, colors, homeData, screenWidth),
-                      const Spacer(),
-                    ],
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    padding: EdgeInsets.only(bottom: 24 * screenHeight / 852),
+                    child: Column(
+                      children: [
+                        SizedBox(height: screenHeight * 0.049),
+                        _buildStudyProgress(context, colors, homeData, screenWidth, screenHeight),
+                        SizedBox(height: screenHeight * 0.045),
+                        _buildTodayLauncher(context, colors, homeData, screenWidth),
+                      ],
+                    ),
                   ),
                 ),
               ],
@@ -479,115 +435,405 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildCurriculumSection(BuildContext context, ThemeColors colors, dynamic homeData, double screenWidth) {
-    final horizontalPadding = screenWidth * 0.081;
+  /// Renders today's plan as a stack of per-subject task launcher cards.
+  /// Each task gets its own card with its own progress and CTA so the user
+  /// can pick what to start next instead of being forced into a fixed
+  /// concept→practice→review carousel order. A mock-exam day pin sits at
+  /// the top when today has a mockExam task. When everything is done, the
+  /// soft-cap CTA "내일 카드에서 +N장 미리 풀기" appears so finishers can
+  /// pull tomorrow forward without breaking the plan's pacing.
+  Widget _buildTodayLauncher(
+    BuildContext context,
+    ThemeColors colors,
+    dynamic homeData,
+    double screenWidth,
+  ) {
+    final hp = screenWidth * 0.081;
+    final today = _viewModel.todayPlan;
+    final subjects = (homeData.subjects as List).cast<dynamic>();
+    final subjectNameById = <String, String>{
+      for (final s in subjects) (s.id as String): (s.name as String),
+    };
+
+    if (today == null || today.isEmpty) {
+      return Padding(
+        padding: EdgeInsets.symmetric(horizontal: hp, vertical: 8),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          decoration: BoxDecoration(
+            color: colors.gray0,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: colors.gray70),
+          ),
+          child: Column(
+            children: [
+              Icon(Icons.event_available, color: colors.gray100, size: 32),
+              const SizedBox(height: 8),
+              Text(
+                '오늘 예정된 학습이 없어요',
+                style: Typo.bodyRegular(context, color: colors.gray500),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '커리큘럼 탭에서 일정을 확인해 보세요.',
+                style: Typo.labelRegular(context, color: colors.gray400),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Sort: mockExam first (pinned banner), then incomplete tasks, then
+    // already-done tasks so the user's current attention sits up top.
+    final mockTasks = today.tasks.where((t) => t.type == TodayTaskType.mockExam).toList();
+    final pendingTasks = today.tasks.where((t) => t.type != TodayTaskType.mockExam && !t.isComplete).toList();
+    final doneTasks = today.tasks.where((t) => t.type != TodayTaskType.mockExam && t.isComplete).toList();
 
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-      child: Container(
-        padding: EdgeInsets.fromLTRB(
-          screenWidth * 0.046,
-          screenWidth * 0.081,
-          screenWidth * 0.046,
-          screenWidth * 0.031,
-        ),
-        decoration: BoxDecoration(
-          color: colors.gray0,
-          border: Border.all(color: colors.gray70, width: 1),
-          borderRadius: BorderRadius.circular(32),
-        ),
-        child: Column(
-          children: [
-            _buildCurriculumList(context, colors, homeData, screenWidth),
-            SizedBox(height: screenWidth * 0.051),
-            Semantics(
-              button: true,
-              identifier: 'home-start-cta',
-              label: _viewModel.startButtonLabel,
-              child: SizedBox(
-                width: double.infinity,
-                child: CustomButton(
-                  text: _viewModel.startButtonLabel,
-                  size: ButtonSize.large,
-                  theme: CustomButtonTheme.primary,
-                  disabled: !_viewModel.canStartCurrentMode,
-                  onPressed: () => _onStartStudy(),
-                ),
+      padding: EdgeInsets.symmetric(horizontal: hp),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (mockTasks.isNotEmpty)
+            ...mockTasks.map((t) => _buildMockExamCallout(context, colors, homeData, t)),
+          if (mockTasks.isNotEmpty) const SizedBox(height: 12),
+          ...pendingTasks.map((t) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _buildLauncherCard(context, colors, t, subjectNameById, locked: false),
+              )),
+          if (doneTasks.isNotEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.only(top: 4, bottom: 8, left: 4),
+              child: Text(
+                '오늘 완료한 학습',
+                style: Typo.labelRegular(context, color: colors.gray400),
               ),
             ),
+            ...doneTasks.map((t) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: _buildLauncherCard(context, colors, t, subjectNameById, locked: true),
+                )),
           ],
-        ),
+          if (today.isAllDone && today.softCapAvailable > 0)
+            _buildSoftCapCTA(context, colors, homeData, today.softCapAvailable),
+          if (today.isAllDone && today.softCapAvailable == 0)
+            _buildAllDoneSuccess(context, colors),
+        ],
       ),
     );
   }
 
-  Widget _buildCurriculumList(BuildContext context, ThemeColors colors, dynamic homeData, double screenWidth) {
-    int completedCount = 0;
-    for (var subject in homeData.subjects) {
-      if (subject.isCompleted) {
-        completedCount++;
-      } else {
-        break;
-      }
-    }
-    
-    final subjectsToShow = homeData.subjects.skip(completedCount).take(2).toList();
-    
-    return Column(
-      children: [
-        for (int i = 0; i < subjectsToShow.length; i++) ...[
-          if (i > 0) SizedBox(height: screenWidth * 0.031),
-          Opacity(
-            opacity: subjectsToShow[i].isCompleted ? 0.5 : 1.0,
-            child: _buildCurriculumItem(
-              context,
-              subjectsToShow[i].name,
-              subjectsToShow[i].isCompleted,
-              colors,
-              screenWidth,
+  Widget _buildMockExamCallout(
+    BuildContext context,
+    ThemeColors colors,
+    dynamic homeData,
+    TodayTask task,
+  ) {
+    final minutes = (homeData.currentCertificate.mockExamMinutes as int?) ?? 90;
+    final certName = homeData.currentCertificate.name as String;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [colors.gray900, colors.gray700],
+        ),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.assignment_outlined, color: colors.gray0, size: 28),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  task.isComplete ? '오늘 모의고사 완료!' : '오늘은 모의고사 보는 날',
+                  style: TextStyle(
+                    fontFamily: 'SeoulAlrim',
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    color: colors.gray0,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '$minutes분 · ${task.completed}/${task.planned}회',
+                  style: Typo.labelRegular(context, color: colors.gray70),
+                ),
+              ],
             ),
           ),
+          if (!task.isComplete)
+            CustomButton(
+              text: '시작',
+              size: ButtonSize.medium,
+              theme: CustomButtonTheme.primary,
+              onPressed: () async {
+                await Get.toNamed(AppRoutes.mockExam, arguments: {
+                  'examName': '$certName 모의고사',
+                  'timeLimitMinutes': minutes,
+                });
+                await _viewModel.refresh();
+              },
+            ),
         ],
-      ],
+      ),
     );
   }
 
-  Widget _buildCurriculumItem(
+  Widget _buildLauncherCard(
     BuildContext context,
-    String title,
-    bool isCompleted,
     ThemeColors colors,
-    double screenWidth,
+    TodayTask task,
+    Map<String, String> subjectNameById,
+    {required bool locked}
   ) {
-    final checkboxSize = screenWidth * 0.046;
-    final iconSize = screenWidth * 0.041;
-
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          title,
-          style: Typo.bodyRegular(context, color: colors.gray900),
-        ),
-        Container(
-          width: checkboxSize,
-          height: checkboxSize,
-          decoration: BoxDecoration(
-            color: isCompleted ? colors.primaryNormal : colors.gray40,
-            borderRadius: BorderRadius.circular(isCompleted ? 99 : 12),
+    final subjectName = task.subjectId != null
+        ? (subjectNameById[task.subjectId!] ?? task.subjectId!)
+        : '';
+    final modeLabel = _todayTypeLabel(task.type);
+    final emoji = _todayTypeEmoji(task.type);
+    final progress = task.planned > 0 ? task.completed / task.planned : 0.0;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+      decoration: BoxDecoration(
+        color: locked ? colors.gray20 : colors.gray0,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: locked ? colors.gray30 : colors.gray70),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: locked ? colors.gray30 : colors.primaryLight,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Center(
+              child: Text(emoji, style: const TextStyle(fontSize: 20)),
+            ),
           ),
-          child: isCompleted
-              ? Center(
-                    child: Assets.icons.check.svg(
-                      width: iconSize,
-                      height: iconSize,
-                      colorFilter: ColorFilter.mode(colors.gray0, BlendMode.srcIn),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    if (subjectName.isNotEmpty) ...[
+                      Flexible(
+                        child: Text(
+                          subjectName,
+                          overflow: TextOverflow.ellipsis,
+                          style: Typo.bodyRegular(context,
+                              color: locked ? colors.gray400 : colors.gray700),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                    ],
+                    Text(
+                      '· $modeLabel',
+                      style: Typo.labelRegular(context, color: colors.gray400),
                     ),
-                )
-              : null,
-        ),
-      ],
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  locked
+                      ? '${task.planned}장 완료'
+                      : '${task.completed}/${task.planned}',
+                  style: TextStyle(
+                    fontFamily: 'SeoulAlrim',
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: locked ? colors.gray400 : colors.gray900,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                if (!locked) ...[
+                  const SizedBox(height: 8),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(99),
+                    child: LinearProgressIndicator(
+                      value: progress.clamp(0.0, 1.0),
+                      minHeight: 4,
+                      backgroundColor: colors.gray30,
+                      valueColor: AlwaysStoppedAnimation(colors.primaryNormal),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          if (locked)
+            Icon(Icons.check_circle, color: colors.primaryNormal, size: 22)
+          else
+            CustomButton(
+              text: task.completed > 0 ? '이어하기' : '시작',
+              size: ButtonSize.medium,
+              theme: CustomButtonTheme.primary,
+              onPressed: () => _launchTask(task, subjectName),
+            ),
+        ],
+      ),
     );
+  }
+
+  Widget _buildSoftCapCTA(
+    BuildContext context,
+    ThemeColors colors,
+    dynamic homeData,
+    int softCapAvailable,
+  ) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+      decoration: BoxDecoration(
+        color: colors.primaryLight,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: colors.primaryNormal),
+      ),
+      child: Column(
+        children: [
+          Text(
+            '오늘 학습 끝!',
+            style: TextStyle(
+              fontFamily: 'SeoulAlrim',
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: colors.primaryNormal,
+              letterSpacing: -0.3,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '여유 있으면 내일 분량 +$softCapAvailable장을 미리 풀 수 있어요.',
+            style: Typo.labelRegular(context, color: colors.gray700),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: CustomButton(
+              text: '+$softCapAvailable장 미리 풀기',
+              size: ButtonSize.medium,
+              theme: CustomButtonTheme.primary,
+              onPressed: () async {
+                final subjects = (homeData.subjects as List).cast<dynamic>();
+                final firstUnlocked = subjects.isNotEmpty ? subjects.first : null;
+                if (firstUnlocked == null) return;
+                await Get.toNamed(AppRoutes.conceptStudy, arguments: {
+                  'subjectName': firstUnlocked.name as String,
+                  'extra': softCapAvailable,
+                });
+                await _viewModel.refresh();
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAllDoneSuccess(BuildContext context, ThemeColors colors) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 24),
+      decoration: BoxDecoration(
+        color: colors.gray0,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: colors.gray70),
+      ),
+      child: Column(
+        children: [
+          Icon(Icons.celebration, size: 36, color: colors.primaryNormal),
+          const SizedBox(height: 8),
+          Text(
+            '오늘 분량 끝! 잘했어요',
+            style: TextStyle(
+              fontFamily: 'SeoulAlrim',
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: colors.gray900,
+              letterSpacing: -0.3,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '내일 다시 만나요.',
+            style: Typo.labelRegular(context, color: colors.gray500),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _launchTask(TodayTask task, String subjectName) async {
+    Future<dynamic>? nav;
+    switch (task.type) {
+      case TodayTaskType.concept:
+        nav = Get.toNamed(AppRoutes.conceptStudy,
+            arguments: {'subjectName': subjectName});
+        break;
+      case TodayTaskType.practice:
+        nav = Get.toNamed(AppRoutes.practiceStudy,
+            arguments: {'subjectName': subjectName});
+        break;
+      case TodayTaskType.review:
+        // Review re-uses the favorites/wrongs screen for now. The dedicated
+        // wrong-answer queue lives at AppRoutes.reviewWrongs (added as part
+        // of the same feature) and is reached from the post-mock CTA.
+        nav = Get.toNamed(AppRoutes.review,
+            arguments: {'subjectName': subjectName});
+        break;
+      case TodayTaskType.mockExam:
+      case TodayTaskType.unknown:
+        return;
+    }
+    if (nav != null) {
+      await nav;
+      await _viewModel.refresh();
+    }
+  }
+
+  String _todayTypeLabel(TodayTaskType type) {
+    switch (type) {
+      case TodayTaskType.concept:
+        return '개념정리';
+      case TodayTaskType.practice:
+        return '기출문제';
+      case TodayTaskType.review:
+        return '복습';
+      case TodayTaskType.mockExam:
+        return '모의고사';
+      case TodayTaskType.unknown:
+        return '학습';
+    }
+  }
+
+  String _todayTypeEmoji(TodayTaskType type) {
+    switch (type) {
+      case TodayTaskType.concept:
+        return '📘';
+      case TodayTaskType.practice:
+        return '✍️';
+      case TodayTaskType.review:
+        return '🔁';
+      case TodayTaskType.mockExam:
+        return '📝';
+      case TodayTaskType.unknown:
+        return '📚';
+    }
   }
 
   Widget _buildCertificateDropdown(BuildContext context, ThemeColors colors, dynamic homeData, double screenWidth) {

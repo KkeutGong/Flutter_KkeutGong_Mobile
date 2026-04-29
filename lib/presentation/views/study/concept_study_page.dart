@@ -35,8 +35,16 @@ class _ResponsiveHelper {
 
 class ConceptStudyPage extends StatefulWidget {
   final String subjectName;
+  // Soft-cap pull-forward — when the home tab's "내일 분량 +N장 미리 풀기"
+  // CTA launches this screen, [extra] tells the deck to also include up to
+  // N cards from tomorrow's plan. The backend clamps to a hard 5 max.
+  final int extra;
 
-  const ConceptStudyPage({super.key, required this.subjectName});
+  const ConceptStudyPage({
+    super.key,
+    required this.subjectName,
+    this.extra = 0,
+  });
 
   @override
   State<ConceptStudyPage> createState() => _ConceptStudyPageState();
@@ -54,7 +62,10 @@ class _ConceptStudyPageState extends State<ConceptStudyPage> {
   @override
   void initState() {
     super.initState();
-    _viewModel = ConceptStudyViewModel(subjectName: widget.subjectName);
+    _viewModel = ConceptStudyViewModel(
+      subjectName: widget.subjectName,
+      extra: widget.extra,
+    );
     _pageController = PageController();
     _viewModel.addListener(_onViewModelChanged);
     _viewModel.loadCards();
@@ -209,12 +220,15 @@ class _ConceptStudyPageState extends State<ConceptStudyPage> {
           ),
         ),
       ),
-          // First-visit swipe interaction hint (shows once via SharedPreferences)
+          // First-visit swipe interaction hint (shows once via SharedPreferences).
+          // Anchored to the top of the body so it doesn't collide with the
+          // card's bottom cover text "아는 용어가 아니면 다시 덮어요" — those
+          // two strings used to read through each other.
           if (_showSwipeHint)
             Positioned(
               left: 0,
               right: 0,
-              bottom: responsive.horizontalPadding,
+              top: 8,
               child: IgnorePointer(
                 child: Center(
                   child: Container(

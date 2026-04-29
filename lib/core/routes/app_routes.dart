@@ -11,6 +11,7 @@ import 'package:kkeutgong_mobile/presentation/views/profile/profile_setup_page.d
 import 'package:kkeutgong_mobile/presentation/views/study/concept_study_page.dart';
 import 'package:kkeutgong_mobile/presentation/views/study/mock_exam_page.dart';
 import 'package:kkeutgong_mobile/presentation/views/study/practice_study_page.dart';
+import 'package:kkeutgong_mobile/presentation/views/study/review_wrongs_page.dart';
 
 class AppRoutes {
   static const String main = '/';
@@ -22,6 +23,7 @@ class AppRoutes {
   static const String conceptStudy = '/study/concept';
   static const String practiceStudy = '/study/practice';
   static const String review = '/study/review';
+  static const String reviewWrongs = '/study/review/wrongs';
   static const String mockExam = '/study/mock-exam';
   static const String addCertificate = '/certificates/add';
   static const String profileSetup = '/profile/setup';
@@ -61,7 +63,9 @@ class AppRoutes {
     GetPage(
       name: conceptStudy,
       page: () => ConceptStudyPage(
-          subjectName: Get.arguments?['subjectName'] ?? ''),
+        subjectName: Get.arguments?['subjectName'] ?? '',
+        extra: (Get.arguments?['extra'] as int?) ?? 0,
+      ),
       transition: Transition.rightToLeft,
     ),
     GetPage(
@@ -74,6 +78,11 @@ class AppRoutes {
       name: review,
       page: () => PracticeStudyPage(
           subjectName: Get.arguments?['subjectName'] ?? ''),
+      transition: Transition.rightToLeft,
+    ),
+    GetPage(
+      name: reviewWrongs,
+      page: () => const ReviewWrongsPage(),
       transition: Transition.rightToLeft,
     ),
     GetPage(

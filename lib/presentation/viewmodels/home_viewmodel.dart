@@ -1,14 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:kkeutgong_mobile/data/repositories/home/home_repository.dart';
+import 'package:kkeutgong_mobile/data/repositories/study/today_repository.dart';
 import 'package:kkeutgong_mobile/domain/models/home/certificate.dart';
 import 'package:kkeutgong_mobile/domain/models/home/home_data.dart';
 import 'package:kkeutgong_mobile/domain/models/home/streak_info.dart';
 import 'package:kkeutgong_mobile/domain/models/home/study_mode.dart';
+import 'package:kkeutgong_mobile/domain/models/study/today_plan.dart';
 
 class HomeViewModel extends ChangeNotifier {
   final HomeRepository _repository;
+  final TodayRepository _todayRepository = TodayRepository();
 
   HomeViewModel(HomeRepository? repository) : _repository = repository ?? HomeRepository();
+
+  TodayPlan? _todayPlan;
+  TodayPlan? get todayPlan => _todayPlan;
 
   HomeData? _homeData;
   HomeData? get homeData => _homeData;
@@ -51,6 +57,13 @@ class HomeViewModel extends ChangeNotifier {
 
     try {
       _homeData = await _repository.getHomeData(forceRefresh: forceRefresh);
+      // Today plan is best-effort — a missing curriculum (brand-new account)
+      // still lets the home tab render the carousel + cert info.
+      try {
+        _todayPlan = await _todayRepository.getToday(forceRefresh: forceRefresh);
+      } catch (_) {
+        _todayPlan = null;
+      }
       _isLoading = false;
       _isInitialized = true;
       notifyListeners();
@@ -63,6 +76,7 @@ class HomeViewModel extends ChangeNotifier {
 
   Future<void> refresh() async {
     _isInitialized = false;
+    _todayRepository.invalidate();
     await loadHomeData(forceRefresh: true);
   }
 

@@ -8,9 +8,11 @@ class ConceptStudyViewModel extends ChangeNotifier {
   final ConceptStudyRepository _repository;
   final StudyProgressRepository _progressRepository = StudyProgressRepository();
   final String subjectName;
+  final int extra;
 
   ConceptStudyViewModel({
     required this.subjectName,
+    this.extra = 0,
     ConceptStudyRepository? repository,
   }) : _repository = repository ?? ConceptStudyRepository();
 
@@ -48,7 +50,15 @@ class ConceptStudyViewModel extends ChangeNotifier {
     if (_allCards.isEmpty) return 0;
     return _knownCardIds.length / _allCards.length;
   }
-  String get progressText => '${_knownCardIds.length}/$totalAllCards';
+  // Counter shown in the AppBar — reads against today's deck (e.g. "3/10")
+  // instead of the full subject pool ("3/187"). The user only sees how much
+  // of *today's* allotment they've worked through, which is the unit of
+  // progress they care about during a session.
+  String get progressText {
+    final knownInDeck =
+        _allCards.where((c) => _knownCardIds.contains(c.id)).length;
+    return '$knownInDeck/$totalAllCards';
+  }
 
     StudyCard? get currentCard => _currentRoundCards.isNotEmpty && _currentIndex < _currentRoundCards.length 
       ? _currentRoundCards[_currentIndex] 
@@ -67,7 +77,11 @@ class ConceptStudyViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _allCards = await _repository.getStudyCards(subjectName, forceRefresh: forceRefresh);
+      _allCards = await _repository.getStudyCards(
+        subjectName,
+        forceRefresh: forceRefresh,
+        extra: extra,
+      );
       final persistedKnown = await _progressRepository.getConceptKnownIds(subjectName);
       final validKnown = persistedKnown.intersection(_allCards.map((e) => e.id).toSet());
       _knownCardIds

@@ -1,5 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:kkeutgong_mobile/core/routes/app_routes.dart';
 import 'package:kkeutgong_mobile/domain/models/study/question.dart';
 import 'package:kkeutgong_mobile/domain/models/study/exam_result.dart';
 import 'package:kkeutgong_mobile/gen/assets.gen.dart';
@@ -1235,7 +1237,9 @@ class _ResultPageState extends State<_ResultPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _buildSummarySection(context, colors, responsive),
-                    SizedBox(height: 24 * responsive.scaleFactor),
+                    SizedBox(height: 16 * responsive.scaleFactor),
+                    _buildReviewWrongsCallout(context, colors, responsive),
+                    SizedBox(height: 16 * responsive.scaleFactor),
                     _buildSubjectScoresSection(context, colors, responsive),
                     SizedBox(height: 24 * responsive.scaleFactor),
                     _buildQuestionReviewSection(context, colors, responsive),
@@ -1246,6 +1250,68 @@ class _ResultPageState extends State<_ResultPage> {
             _buildBottomButton(context, colors, responsive),
           ],
         ),
+      ),
+    );
+  }
+
+  /// "오답 N개를 약점복습에 담았어요 — 지금 풀어볼래요?" — pinned right under
+  /// the summary so the user has a single tap from result screen into the
+  /// review-wrongs queue. Hidden when the user got every question right
+  /// (no wrong answers to surface).
+  Widget _buildReviewWrongsCallout(
+    BuildContext context,
+    ThemeColors colors,
+    _ResponsiveHelper responsive,
+  ) {
+    final wrongCount = widget.result.totalQuestions - widget.result.correctCount;
+    if (wrongCount <= 0) return const SizedBox.shrink();
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(
+        horizontal: 18 * responsive.scaleFactor,
+        vertical: 16 * responsive.scaleFactor,
+      ),
+      decoration: BoxDecoration(
+        color: colors.primaryLight,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: colors.primaryNormal),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.psychology_alt_outlined, color: colors.primaryNormal, size: 28),
+          SizedBox(width: 12 * responsive.scaleFactor),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '오답 $wrongCount개를 약점복습에 담았어요',
+                  style: TextStyle(
+                    fontFamily: 'SeoulAlrim',
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: colors.gray900,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '지금 한 번 더 풀어볼래요?',
+                  style: Typo.labelRegular(context, color: colors.gray700),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          CustomButton(
+            text: '풀어보기',
+            size: ButtonSize.medium,
+            theme: CustomButtonTheme.primary,
+            onPressed: () {
+              Get.toNamed(AppRoutes.reviewWrongs);
+            },
+          ),
+        ],
       ),
     );
   }
