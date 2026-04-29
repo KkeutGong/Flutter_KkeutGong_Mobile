@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:kkeutgong_mobile/core/routes/app_routes.dart';
+import 'package:kkeutgong_mobile/domain/models/curriculum/curriculum_plan.dart';
 import 'package:kkeutgong_mobile/domain/models/home/certificate.dart';
 import 'package:kkeutgong_mobile/domain/models/home/home_data.dart';
 import 'package:kkeutgong_mobile/domain/models/home/study_mode.dart';
@@ -22,6 +23,7 @@ class CurriculumPage extends StatefulWidget {
 
 class _CurriculumPageState extends State<CurriculumPage> {
   late final CurriculumViewModel _viewModel;
+  final ScrollController _dayTabsController = ScrollController();
 
   @override
   void initState() {
@@ -33,6 +35,7 @@ class _CurriculumPageState extends State<CurriculumPage> {
 
   @override
   void dispose() {
+    _dayTabsController.dispose();
     _viewModel.removeListener(_onChanged);
     _viewModel.dispose();
     super.dispose();
@@ -98,6 +101,7 @@ class _CurriculumPageState extends State<CurriculumPage> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       _buildSummarySection(context, colors, data, scale, isTablet, horizontalPadding),
+                      _buildDayTabs(context, colors, scale, horizontalPadding),
                       _buildTodayPlanSection(context, colors, scale, horizontalPadding),
                       if (sectionWidgets.isNotEmpty) ...[
                         const SizedBox(height: 60),
@@ -317,13 +321,108 @@ class _CurriculumPageState extends State<CurriculumPage> {
     );
   }
 
+  /// Horizontal day tabs that scope the rest of the curriculum tab to a
+  /// single day in the user's plan. Auto-scrolls to today on first build so
+  /// the default view matches the user's mental model ("내 오늘의 학습").
+  Widget _buildDayTabs(
+    BuildContext context,
+    ThemeColors colors,
+    double scale,
+    double horizontalPadding,
+  ) {
+    final plan = _viewModel.myCurriculum?.plan;
+    if (plan == null || plan.days.isEmpty) return const SizedBox.shrink();
+    final selectedIdx = _viewModel.selectedDayIndex;
+    final todayIdx = _viewModel.todayDayIndex;
+
+    // Auto-scroll the strip so the selected day is visible. Each pill is
+    // ~64px wide; nudge by a few items so today doesn't sit at the very edge.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_dayTabsController.hasClients) return;
+      final target =
+          (selectedIdx * 72.0 - 80).clamp(0.0, _dayTabsController.position.maxScrollExtent);
+      _dayTabsController.animateTo(
+        target,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+      );
+    });
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(0, 16 * scale, 0, 4 * scale),
+      child: SizedBox(
+        height: 56 * scale,
+        child: ListView.separated(
+          controller: _dayTabsController,
+          scrollDirection: Axis.horizontal,
+          padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+          physics: const BouncingScrollPhysics(),
+          itemCount: plan.days.length,
+          separatorBuilder: (_, __) => SizedBox(width: 8 * scale),
+          itemBuilder: (context, index) {
+            final day = plan.days[index];
+            final isSelected = index == selectedIdx;
+            final isToday = index == todayIdx;
+            final isSprint = day.phase == CurriculumDayPhase.sprint;
+            final bg = isSelected
+                ? (isSprint ? colors.gray900 : colors.primaryNormal)
+                : colors.gray0;
+            final fg = isSelected ? colors.gray0 : colors.gray700;
+            final border = isSelected
+                ? (isSprint ? colors.gray900 : colors.primaryNormal)
+                : colors.gray70;
+
+            return GestureDetector(
+              onTap: () => _viewModel.selectDay(index),
+              behavior: HitTestBehavior.opaque,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: bg,
+                  borderRadius: BorderRadius.circular(99),
+                  border: Border.all(color: border, width: 1.2),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Text(
+                      'Day ${day.day}',
+                      style: TextStyle(
+                        fontFamily: 'Pretendard',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: fg,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                    Text(
+                      isToday ? '오늘' : '${day.date.month}/${day.date.day}',
+                      style: TextStyle(
+                        fontFamily: 'Pretendard',
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                        color: fg.withValues(alpha: isSelected ? 1 : 0.65),
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
   Widget _buildTodayPlanSection(
     BuildContext context,
     ThemeColors colors,
     double scale,
     double horizontalPadding,
   ) {
-    final counts = _viewModel.todayTaskCounts;
+    final counts = _viewModel.selectedDayTaskCounts;
     final hasAnyTask = counts.conceptCount > 0 ||
         counts.practiceCount > 0 ||
         counts.reviewCount > 0 ||
@@ -340,15 +439,20 @@ class _CurriculumPageState extends State<CurriculumPage> {
       return const SizedBox.shrink();
     }
 
-    final today = DateTime.now();
-    final dateLabel = '${today.month}월 ${today.day}일';
-    final progress = _viewModel.todayProgress;
+    final selectedDay = _viewModel.selectedDay;
+    final viewedDate = selectedDay?.date ?? DateTime.now();
+    final dateLabel = '${viewedDate.month}월 ${viewedDate.day}일';
+    final isToday = _viewModel.selectedDayIsToday;
+    // Today shows real progress; future/past days show 0 (no live progress
+    // signal for non-today plans).
+    final progress = isToday ? _viewModel.todayProgress : 0.0;
     final percent = (progress * 100).round();
-    final isSprint = _viewModel.isSprintToday;
+    final isSprint = (selectedDay?.phase == CurriculumDayPhase.sprint);
     final overload = _viewModel.planOverload;
     final coachingMessage = _viewModel.coachingMessage;
-    final completed = _viewModel.todayCompleted;
-    final planned = _viewModel.todayPlanned;
+    final completed = isToday ? _viewModel.todayCompleted : 0;
+    final planned =
+        isToday ? _viewModel.todayPlanned : (selectedDay?.tasks.fold<int>(0, (sum, t) => sum + t.count) ?? 0);
 
     final accentColor = isSprint ? colors.gray900 : colors.primaryNormal;
     final accentLight = isSprint ? colors.gray70 : colors.primaryLight;
@@ -385,7 +489,9 @@ class _CurriculumPageState extends State<CurriculumPage> {
                         borderRadius: BorderRadius.circular(99),
                       ),
                       child: Text(
-                        isSprint ? '마무리 스프린트' : '오늘의 학습',
+                        isSprint
+                            ? '마무리 스프린트'
+                            : (isToday ? '오늘의 학습' : 'Day ${selectedDay?.day ?? 1}'),
                         style: TextStyle(
                           fontFamily: 'Pretendard',
                           fontSize: 11,
@@ -574,7 +680,11 @@ class _CurriculumPageState extends State<CurriculumPage> {
   }
 
   List<Widget> _buildSections(BuildContext context, ThemeColors colors) {
-    final subjects = _viewModel.subjects;
+    // Subjects in scope of the currently selected day. Future-day subjects
+    // appear with disabled buttons (locked until that day arrives) so the
+    // user can preview the roadmap without launching a study session out
+    // of order.
+    final subjects = _viewModel.selectedDaySubjects;
     final items = <Widget>[];
     for (int i = 0; i < subjects.length; i++) {
       if (i > 0) {
@@ -657,8 +767,11 @@ class _CurriculumPageState extends State<CurriculumPage> {
   ) {
     final progress = _viewModel.progressPercentage(subject, mode);
     final label = _viewModel.unitButtonLabel(subject, mode);
-    final locked = _viewModel.isUnitLocked(subject, mode);
-    final enabled = _viewModel.unitButtonEnabled(subject, mode);
+    // Lock everything when previewing a non-today day — past days lose
+    // meaning to start fresh, and future days haven't unlocked yet.
+    final isViewingToday = _viewModel.selectedDayIsToday;
+    final locked = !isViewingToday || _viewModel.isUnitLocked(subject, mode);
+    final enabled = isViewingToday && _viewModel.unitButtonEnabled(subject, mode);
     final completed = progress >= 1;
     final textColor = subject.isCompleted ? colors.gray600 : colors.gray900;
 

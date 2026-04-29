@@ -43,7 +43,22 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _onStartStudy() async {
-    final currentMode = _viewModel.currentMode;
+    // Use `effectiveMode` so finishing 개념정리 doesn't strand the user on a
+    // "완료" button — the CTA naturally pivots to 기출문제 (and so on) once
+    // the current step is done.
+    final targetMode = _viewModel.effectiveMode;
+    final targetIndex = _viewModel.studyModes.indexOf(targetMode);
+    if (targetIndex >= 0 && targetIndex != _viewModel.currentModeIndex) {
+      _viewModel.setCurrentMode(targetIndex);
+      if (_pageController.hasClients) {
+        _pageController.animateToPage(
+          targetIndex,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeInOut,
+        );
+      }
+    }
+
     final hd = _viewModel.homeData;
     final subjectName = (hd == null || hd.subjects.isEmpty)
         ? ''
@@ -51,9 +66,9 @@ class _HomePageState extends State<HomePage> {
               (s) => !s.isCompleted,
               orElse: () => hd.subjects.first,
             ).name);
-    
+
     Future<dynamic>? nav;
-    switch (currentMode) {
+    switch (targetMode) {
       case StudyMode.concept:
         nav = Get.toNamed(AppRoutes.conceptStudy, arguments: {'subjectName': subjectName});
         break;

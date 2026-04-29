@@ -103,21 +103,38 @@ class HomeViewModel extends ChangeNotifier {
 
   bool get isCurrentModeCompleted => currentModeProgress >= 1.0;
 
+  bool isModeCompleted(StudyMode mode) => modeProgress(mode) >= 1.0;
+
+  /// The mode the bottom CTA should actually launch into. Falls back to the
+  /// next incomplete mode in the carousel order when the current one is
+  /// already done, so a 100%-complete 개념정리 step naturally points the user
+  /// at 기출문제 instead of dead-ending on a "완료" button.
+  StudyMode get effectiveMode {
+    if (!isModeCompleted(_currentMode)) return _currentMode;
+    for (final mode in _studyModes) {
+      if (!isModeCompleted(mode)) return mode;
+    }
+    return _currentMode;
+  }
+
+  bool get isAllModesCompleted =>
+      _studyModes.every((mode) => isModeCompleted(mode));
+
   String get startButtonLabel {
-    final progress = currentModeProgress;
-    if (progress >= 1) return '완료';
-    if (progress > 0) return '계속하기';
-    return '시작하기';
+    if (isAllModesCompleted) return '오늘 학습 끝!';
+    final mode = effectiveMode;
+    final progress = modeProgress(mode);
+    final verb = progress > 0 ? '이어하기' : '시작하기';
+    return '${mode.displayName} $verb';
   }
 
   bool get canStartCurrentMode {
     final data = _homeData;
     if (data == null) return false;
+    if (isAllModesCompleted) return false;
 
-    // 이미 완료된 모드는 시작 불가
-    if (isCurrentModeCompleted) return false;
-
-    switch (_currentMode) {
+    final mode = effectiveMode;
+    switch (mode) {
       case StudyMode.concept:
         return true;
       case StudyMode.practice:

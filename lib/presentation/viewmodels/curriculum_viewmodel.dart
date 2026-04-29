@@ -188,6 +188,101 @@ class CurriculumViewModel extends ChangeNotifier {
     return c.dayFor(DateTime.now());
   }
 
+  // ── Day pager ────────────────────────────────────────────────────────────
+  // Curriculum tab is laid out day-by-day rather than as one flat subject
+  // list. Default selection is today's day; the user can swipe to peek at
+  // future days (or back at past ones) without losing context.
+
+  int? _selectedDayIndex;
+
+  int get todayDayIndex {
+    final c = _myCurriculum;
+    if (c == null) return 0;
+    final today = DateTime.now();
+    final todayKey = DateTime(today.year, today.month, today.day);
+    for (int i = 0; i < c.plan.days.length; i++) {
+      final d = c.plan.days[i];
+      final dKey = DateTime(d.date.year, d.date.month, d.date.day);
+      if (dKey == todayKey) return i;
+    }
+    return 0;
+  }
+
+  int get selectedDayIndex => _selectedDayIndex ?? todayDayIndex;
+
+  CurriculumDay? get selectedDay {
+    final c = _myCurriculum;
+    if (c == null) return null;
+    final idx = selectedDayIndex;
+    if (idx < 0 || idx >= c.plan.days.length) return null;
+    return c.plan.days[idx];
+  }
+
+  void selectDay(int index) {
+    final c = _myCurriculum;
+    if (c == null) return;
+    if (index < 0 || index >= c.plan.days.length) return;
+    _selectedDayIndex = index;
+    notifyListeners();
+  }
+
+  bool get selectedDayIsToday {
+    final day = selectedDay;
+    if (day == null) return false;
+    final today = DateTime.now();
+    return day.date.year == today.year &&
+        day.date.month == today.month &&
+        day.date.day == today.day;
+  }
+
+  ({int conceptCount, int practiceCount, int reviewCount, int mockExamCount})
+      get selectedDayTaskCounts {
+    final day = selectedDay;
+    if (day == null) {
+      return (conceptCount: 0, practiceCount: 0, reviewCount: 0, mockExamCount: 0);
+    }
+    int concept = 0, practice = 0, review = 0, mock = 0;
+    for (final t in day.tasks) {
+      switch (t.type) {
+        case CurriculumTaskType.concept:
+          concept += t.count;
+          break;
+        case CurriculumTaskType.practice:
+          practice += t.count;
+          break;
+        case CurriculumTaskType.review:
+          review += t.count;
+          break;
+        case CurriculumTaskType.mockExam:
+          mock += t.count;
+          break;
+        case CurriculumTaskType.unknown:
+          break;
+      }
+    }
+    return (
+      conceptCount: concept,
+      practiceCount: practice,
+      reviewCount: review,
+      mockExamCount: mock,
+    );
+  }
+
+  /// Subjects whose tasks appear in the currently selected day. Empty days
+  /// (review-only / mock-only) fall back to the full subject list so the
+  /// user still sees something to act on.
+  List<Subject> get selectedDaySubjects {
+    final all = _homeData?.subjects ?? const <Subject>[];
+    final day = selectedDay;
+    if (day == null) return all;
+    final ids = <String>{};
+    for (final t in day.tasks) {
+      if (t.subjectId != null) ids.add(t.subjectId!);
+    }
+    if (ids.isEmpty) return all;
+    return all.where((s) => ids.contains(s.id)).toList();
+  }
+
   /// Aggregated counts for today, broken down by task type. Mock-exam count
   /// is shown separately because it's the only task type that's per-cert
   /// rather than per-subject (and the UI label differs).
