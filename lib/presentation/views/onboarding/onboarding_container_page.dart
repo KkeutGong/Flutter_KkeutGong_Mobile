@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:kkeutgong_mobile/core/notifications/notification_service.dart';
 import 'package:kkeutgong_mobile/data/repositories/catalog/catalog_repository.dart';
 import 'package:kkeutgong_mobile/domain/models/home/certificate.dart';
 import 'package:kkeutgong_mobile/domain/models/home/exam_session.dart';
@@ -271,9 +272,21 @@ class _OnboardingContainerPageState extends State<OnboardingContainerPage> {
 
   Future<void> _requestNotificationPermission() async {
     final currentStatus = await Permission.notification.status;
-    if (currentStatus.isGranted) return;
-    
-    await Permission.notification.request();
+    PermissionStatus finalStatus = currentStatus;
+    if (!currentStatus.isGranted) {
+      finalStatus = await Permission.notification.request();
+    }
+    // The whole point of this onboarding step is the daily learning
+    // reminder — schedule it the moment we have permission so the user
+    // doesn't have to opt in twice (system permission + in-app toggle).
+    if (finalStatus.isGranted) {
+      try {
+        await NotificationService().scheduleDailyReminder();
+      } catch (_) {
+        // Best-effort — failure here just means the user won't get the
+        // daily reminder until they re-trigger it from settings later.
+      }
+    }
   }
 
   void _previousStep() {

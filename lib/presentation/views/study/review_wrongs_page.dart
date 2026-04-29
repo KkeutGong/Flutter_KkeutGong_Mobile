@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:kkeutgong_mobile/data/repositories/study/review_wrongs_repository.dart';
 import 'package:kkeutgong_mobile/presentation/widgets/common/custom_button.dart';
+import 'package:kkeutgong_mobile/presentation/widgets/study/answer_feedback_sheet.dart';
 import 'package:kkeutgong_mobile/shared/styles/colors.dart';
 import 'package:kkeutgong_mobile/shared/styles/typography.dart';
 
@@ -63,13 +64,24 @@ class _ReviewWrongsPageState extends State<ReviewWrongsPage> {
   Future<void> _submit() async {
     if (_selected == null || _items.isEmpty) return;
     final current = _items[_index];
+    final picked = _selected!;
     try {
-      final result = await _repo.resolve(current.questionId, _selected!);
+      final result = await _repo.resolve(current.questionId, picked);
       if (!mounted) return;
       setState(() {
         _wasCorrect = result.resolved;
         _correctAnswerShown = result.correctAnswer;
       });
+      // Pop the AI feedback sheet so the user gets a tailored explanation
+      // right at the moment of confusion. The sheet is consistent across
+      // practice/mock/review so the help layer feels unified.
+      // ignore: use_build_context_synchronously
+      await AnswerFeedbackSheet.show(
+        context,
+        questionId: current.questionId,
+        selectedAnswer: picked,
+        localExplanation: current.explanation,
+      );
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

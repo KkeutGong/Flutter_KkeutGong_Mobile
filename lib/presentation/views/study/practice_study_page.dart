@@ -4,6 +4,7 @@ import 'package:kkeutgong_mobile/data/repositories/home/home_repository.dart';
 import 'package:kkeutgong_mobile/domain/models/study/question.dart';
 import 'package:kkeutgong_mobile/presentation/viewmodels/study/practice_study_viewmodel.dart';
 import 'package:kkeutgong_mobile/presentation/widgets/common/empty_state.dart';
+import 'package:kkeutgong_mobile/presentation/widgets/study/answer_feedback_sheet.dart';
 import 'package:kkeutgong_mobile/shared/styles/colors.dart';
 import 'package:kkeutgong_mobile/shared/styles/typography.dart';
 import 'package:kkeutgong_mobile/gen/assets.gen.dart';
@@ -306,7 +307,20 @@ class _PracticeStudyPageState extends State<PracticeStudyPage> {
       label: '${choice.number}번 보기 선택',
       button: true,
       child: GestureDetector(
-      onTap: hasAnswered ? null : () => _viewModel.selectAnswer(choice.number),
+      onTap: hasAnswered
+          ? null
+          : () async {
+              _viewModel.selectAnswer(choice.number);
+              // After locking the answer, immediately pop the AI feedback
+              // sheet so the user gets a tailored explanation right at the
+              // moment of confusion. Same pattern across practice/mock/review.
+              await AnswerFeedbackSheet.show(
+                context,
+                questionId: q.id,
+                selectedAnswer: choice.number,
+                localExplanation: q.explanation,
+              );
+            },
       child: Container(
         width: double.infinity,
         padding: EdgeInsets.symmetric(horizontal: responsive.choicePaddingH, vertical: responsive.choicePaddingV),

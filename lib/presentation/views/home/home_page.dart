@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:kkeutgong_mobile/core/routes/app_routes.dart';
-import 'package:kkeutgong_mobile/domain/models/home/study_mode.dart';
 import 'package:kkeutgong_mobile/domain/models/study/today_plan.dart';
 import 'package:kkeutgong_mobile/gen/assets.gen.dart';
+import 'package:kkeutgong_mobile/presentation/widgets/home/pass_meter.dart';
 import 'package:kkeutgong_mobile/presentation/viewmodels/home_viewmodel.dart';
 import 'package:kkeutgong_mobile/presentation/views/home/home_page_skeleton.dart';
 import 'package:kkeutgong_mobile/presentation/views/home/streak_bottom_sheet.dart';
@@ -20,20 +20,17 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   late final HomeViewModel _viewModel;
-  late final PageController _pageController;
 
   @override
   void initState() {
     super.initState();
     _viewModel = HomeViewModel(null);
-    _pageController = PageController();
     _viewModel.loadHomeData();
     _viewModel.addListener(_onViewModelChanged);
   }
 
   @override
   void dispose() {
-    _pageController.dispose();
     _viewModel.removeListener(_onViewModelChanged);
     _viewModel.dispose();
     super.dispose();
@@ -81,16 +78,25 @@ class _HomePageState extends State<HomePage> {
               children: [
                 _buildAppBar(context, colors, homeData, screenWidth),
                 Expanded(
-                  child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    padding: EdgeInsets.only(bottom: 24 * screenHeight / 852),
-                    child: Column(
-                      children: [
-                        SizedBox(height: screenHeight * 0.049),
-                        _buildStudyProgress(context, colors, homeData, screenWidth, screenHeight),
-                        SizedBox(height: screenHeight * 0.045),
-                        _buildTodayLauncher(context, colors, homeData, screenWidth),
-                      ],
+                  child: RefreshIndicator(
+                    onRefresh: () => _viewModel.refresh(),
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+                      padding: EdgeInsets.only(bottom: 24 * screenHeight / 852),
+                      child: Column(
+                        children: [
+                          SizedBox(height: screenHeight * 0.025),
+                          _buildDailyHero(context, colors, homeData, screenWidth),
+                          SizedBox(height: screenHeight * 0.018),
+                          _buildCoachBanner(context, colors, screenWidth),
+                          if (_viewModel.todayPlan?.adaptation?.changed == true) ...[
+                            SizedBox(height: screenHeight * 0.012),
+                            _buildAdaptationToast(context, colors, screenWidth),
+                          ],
+                          SizedBox(height: screenHeight * 0.022),
+                          _buildTodayLauncher(context, colors, homeData, screenWidth),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -115,6 +121,278 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  /// Hero card at the top of the home tab. Shows cert + D-day on the left
+  /// and the always-on pass-likelihood gauge on the right. Tap on the gauge
+  /// opens a bottom sheet that explains how the number was computed (so the
+  /// user trusts the AI signal).
+  Widget _buildDailyHero(
+    BuildContext context,
+    ThemeColors colors,
+    dynamic homeData,
+    double screenWidth,
+  ) {
+    final hp = screenWidth * 0.06;
+    final today = _viewModel.todayPlan;
+    final dDay = today?.dDay;
+    final certName = (homeData.currentCertificate.name as String?) ?? '';
+    final passValue = today?.passLikelihood ?? 0;
+    final reason = today?.passLikelihoodReason ?? '';
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: hp),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(20, 20, 16, 20),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              colors.primaryNormal.withValues(alpha: 0.95),
+              colors.primaryNormal.withValues(alpha: 0.78),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: colors.primaryNormal.withValues(alpha: 0.18),
+              offset: const Offset(0, 6),
+              blurRadius: 12,
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: colors.gray0.withValues(alpha: 0.22),
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                    child: Text(
+                      dDay != null ? 'D-$dDay' : '시험일 미정',
+                      style: TextStyle(
+                        fontFamily: 'Pretendard',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: colors.gray0,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    certName.isNotEmpty ? certName : '자격증',
+                    style: TextStyle(
+                      fontFamily: 'SeoulAlrim',
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: colors.gray0,
+                      height: 1.3,
+                      letterSpacing: -0.3,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    '오늘 따라가면 합격까지 갑니다.',
+                    style: TextStyle(
+                      fontFamily: 'Pretendard',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: colors.gray0.withValues(alpha: 0.92),
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            GestureDetector(
+              onTap: () => _showPassLikelihoodSheet(context, colors, passValue, reason),
+              child: PassMeter(value: passValue, size: 96),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showPassLikelihoodSheet(
+    BuildContext context,
+    ThemeColors colors,
+    int value,
+    String reason,
+  ) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: colors.gray0,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '합격 가능성 $value%',
+              style: TextStyle(
+                fontFamily: 'SeoulAlrim',
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+                color: colors.gray900,
+                letterSpacing: -0.4,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              reason.isNotEmpty
+                  ? reason
+                  : '아직 학습 데이터가 없어요. 오늘 첫 학습이 첫 점수가 됩니다.',
+              style: Typo.bodyRegular(context, color: colors.gray700)
+                  .copyWith(height: 1.5),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: colors.gray20,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                '계산식 = 연습 정답률 50% + 진도 30% + 모의고사 20%. 학습량이 적은 동안엔 보수적으로 표시됩니다.',
+                style: Typo.labelRegular(context, color: colors.gray500)
+                    .copyWith(height: 1.5),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Always-on coach banner. Renders even when Qwen is unreachable — the
+  /// backend produces a deterministic fallback so this view never empty.
+  Widget _buildCoachBanner(
+    BuildContext context,
+    ThemeColors colors,
+    double screenWidth,
+  ) {
+    final hp = screenWidth * 0.06;
+    final coach = _viewModel.todayPlan?.coachMessage;
+    if (coach == null || coach.text.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: hp),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: colors.gray0,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: colors.gray70),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Padding(
+              padding: EdgeInsets.only(top: 1, right: 10),
+              child: Text('🧠', style: TextStyle(fontSize: 18, fontFamily: 'TossFace')),
+            ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        'AI 코치',
+                        style: TextStyle(
+                          fontFamily: 'Pretendard',
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: colors.primaryNormal,
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                      if (coach.isFallback) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: colors.gray20,
+                            borderRadius: BorderRadius.circular(99),
+                          ),
+                          child: Text(
+                            '기본 가이드',
+                            style: TextStyle(
+                              fontFamily: 'Pretendard',
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: colors.gray500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    coach.text,
+                    style: Typo.bodyRegular(context, color: colors.gray900)
+                        .copyWith(height: 1.5),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Renders only when /study/today reports a recent recompute. The toast
+  /// names the top 1-2 subject deltas so the user feels the AI adapted.
+  Widget _buildAdaptationToast(
+    BuildContext context,
+    ThemeColors colors,
+    double screenWidth,
+  ) {
+    final hp = screenWidth * 0.06;
+    final adapt = _viewModel.todayPlan?.adaptation;
+    if (adapt == null || !adapt.changed) return const SizedBox.shrink();
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: hp),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: colors.primaryLight,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: colors.primaryNormal.withValues(alpha: 0.4)),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.auto_awesome, color: colors.primaryNormal, size: 18),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'AI가 plan을 조정했어요 — ${adapt.summary}',
+                style: TextStyle(
+                  fontFamily: 'Pretendard',
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: colors.primaryNormal,
+                  letterSpacing: -0.2,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -266,182 +544,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildStudyProgress(BuildContext context, ThemeColors colors, dynamic homeData, double screenWidth, double screenHeight) {
-    final horizontalPadding = screenWidth * 0.188;
-
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-      child: Column(
-        children: [
-          _buildProgressBar(colors, homeData),
-          SizedBox(height: screenHeight * 0.019),
-          _buildStudyInfo(context, colors, homeData),
-          SizedBox(height: screenHeight * 0.038),
-          _buildStudyCardSlider(context, colors, screenWidth, screenHeight),
-          SizedBox(height: screenHeight * 0.019),
-          _buildPageIndicators(colors, screenWidth),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildProgressBar(ThemeColors colors, dynamic homeData) {
-    return Container(
-      height: 8,
-      decoration: BoxDecoration(
-        color: colors.gray90,
-        borderRadius: BorderRadius.circular(99),
-      ),
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: FractionallySizedBox(
-          widthFactor: homeData.progress,
-          child: Container(
-            decoration: BoxDecoration(
-              color: colors.gray900,
-              borderRadius: BorderRadius.circular(99),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStudyInfo(BuildContext context, ThemeColors colors, dynamic homeData) {
-    return Column(
-      children: [
-        Text(
-          homeData.currentCertificate.name,
-          style: Typo.titleStrong(context, color: colors.gray900),
-        ),
-        const SizedBox(height: 5),
-        Text(
-          'Day ${homeData.currentDay}',
-          style: Typo.headingStrong(context, color: colors.primaryNormal),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStudyCardForMode(BuildContext context, ThemeColors colors, StudyMode mode, double screenWidth, double screenHeight) {
-    final iconSize = screenWidth * 0.234;
-    final horizontalPadding = screenWidth * 0.122;
-    final verticalPadding = screenWidth * 0.061;
-    final gap = screenWidth * 0.036;
-
-    return Center(
-      child: Container(
-        padding: EdgeInsets.symmetric(
-          horizontal: horizontalPadding,
-          vertical: verticalPadding,
-        ),
-        decoration: BoxDecoration(
-          color: colors.gray0,
-          border: Border.all(color: colors.gray300, width: 1),
-          borderRadius: BorderRadius.circular(32),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            SizedBox(
-              width: iconSize,
-              height: iconSize,
-              child: _getIconForMode(mode, colors, iconSize),
-            ),
-            SizedBox(height: gap),
-            Text(
-              mode.displayName,
-              style: Typo.titleStrong(context, color: colors.gray900),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _getIconForMode(StudyMode mode, ThemeColors colors, double iconSize) {
-    Widget icon;
-    switch (mode) {
-      case StudyMode.concept:
-        icon = Assets.icons.draw.svg(
-          width: iconSize,
-          height: iconSize,
-          colorFilter: ColorFilter.mode(colors.gray900, BlendMode.srcIn),
-        );
-        break;
-      case StudyMode.practice:
-        icon = Assets.icons.article.svg(
-          width: iconSize,
-          height: iconSize,
-          colorFilter: ColorFilter.mode(colors.gray900, BlendMode.srcIn),
-        );
-        break;
-      case StudyMode.review:
-        icon = Assets.icons.menuBook.svg(
-          width: iconSize,
-          height: iconSize,
-          colorFilter: ColorFilter.mode(colors.gray900, BlendMode.srcIn),
-        );
-        break;
-    }
-    return icon;
-  }
-
-  Widget _buildStudyCardSlider(BuildContext context, ThemeColors colors, double screenWidth, double screenHeight) {
-    final cardHeight = screenWidth * 0.48;
-
-    return SizedBox(
-      width: double.infinity,
-      height: cardHeight,
-      child: PageView.builder(
-        controller: _pageController,
-        onPageChanged: (index) {
-          _viewModel.setCurrentMode(index);
-        },
-        itemCount: _viewModel.studyModes.length,
-        itemBuilder: (context, index) {
-          return _buildStudyCardForMode(context, colors, _viewModel.studyModes[index], screenWidth, screenHeight);
-        },
-      ),
-    );
-  }
-
-  Widget _buildPageIndicators(ThemeColors colors, double screenWidth) {
-    final indicatorSize = screenWidth * 0.023;
-    final indicatorSpacing = screenWidth * 0.015;
-
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(
-        _viewModel.studyModes.length,
-        (index) => Padding(
-          padding: EdgeInsets.only(left: index > 0 ? indicatorSpacing : 0),
-          child: _buildPageIndicator(colors, index == _viewModel.currentModeIndex, indicatorSize),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPageIndicator(ThemeColors colors, bool isActive, double size) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: isActive ? colors.primaryNormal : colors.gray60,
-        borderRadius: BorderRadius.circular(8),
-      ),
-    );
-  }
-
-  /// Renders today's plan as a stack of per-subject task launcher cards.
-  /// Each task gets its own card with its own progress and CTA so the user
-  /// can pick what to start next instead of being forced into a fixed
-  /// concept→practice→review carousel order. A mock-exam day pin sits at
-  /// the top when today has a mockExam task. When everything is done, the
-  /// soft-cap CTA "내일 카드에서 +N장 미리 풀기" appears so finishers can
-  /// pull tomorrow forward without breaking the plan's pacing.
   Widget _buildTodayLauncher(
     BuildContext context,
     ThemeColors colors,
@@ -489,9 +591,13 @@ class _HomePageState extends State<HomePage> {
 
     // Sort: mockExam first (pinned banner), then incomplete tasks, then
     // already-done tasks so the user's current attention sits up top.
-    final mockTasks = today.tasks.where((t) => t.type == TodayTaskType.mockExam).toList();
-    final pendingTasks = today.tasks.where((t) => t.type != TodayTaskType.mockExam && !t.isComplete).toList();
-    final doneTasks = today.tasks.where((t) => t.type != TodayTaskType.mockExam && t.isComplete).toList();
+    // Render order driven by the AI-adaptive `orderedTasks` from the
+    // backend, not the raw curriculum order, so the user sees the weakest
+    // subject first today (and a different one tomorrow).
+    final ordered = today.orderedTasks.isNotEmpty ? today.orderedTasks : today.tasks;
+    final mockTasks = ordered.where((t) => t.type == TodayTaskType.mockExam).toList();
+    final pendingTasks = ordered.where((t) => t.type != TodayTaskType.mockExam && !t.isComplete).toList();
+    final doneTasks = ordered.where((t) => t.type != TodayTaskType.mockExam && t.isComplete).toList();
 
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: hp),
