@@ -323,82 +323,217 @@ class _CurriculumPageState extends State<CurriculumPage> {
     double scale,
     double horizontalPadding,
   ) {
-    // Hides itself when the user has no curriculum or today is past the
-    // generated plan window. The summary section above already shows D-day,
-    // so an empty state here would be redundant.
     final counts = _viewModel.todayTaskCounts;
-    if (counts.conceptCount == 0 && counts.practiceCount == 0) {
+    final hasAnyTask = counts.conceptCount > 0 ||
+        counts.practiceCount > 0 ||
+        counts.reviewCount > 0 ||
+        counts.mockExamCount > 0;
+
+    // "콘텐츠 준비중" — backend reports an empty content guard. Show a
+    // friendly placeholder so the user isn't staring at an empty screen.
+    if (_viewModel.planEmptyContent) {
+      return _buildContentPlaceholder(context, colors, scale, horizontalPadding);
+    }
+    // No plan or past the planned window. Summary section above shows D-day
+    // already, so we just hide.
+    if (!hasAnyTask) {
       return const SizedBox.shrink();
     }
+
     final today = DateTime.now();
     final dateLabel = '${today.month}월 ${today.day}일';
     final progress = _viewModel.todayProgress;
     final percent = (progress * 100).round();
+    final isSprint = _viewModel.isSprintToday;
+    final overload = _viewModel.planOverload;
+    final coachingMessage = _viewModel.coachingMessage;
+    final completed = _viewModel.todayCompleted;
+    final planned = _viewModel.todayPlanned;
+
+    final accentColor = isSprint ? colors.gray900 : colors.primaryNormal;
+    final accentLight = isSprint ? colors.gray70 : colors.primaryLight;
 
     return Padding(
       padding: EdgeInsets.fromLTRB(horizontalPadding, 16 * scale, horizontalPadding, 0),
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 18 * scale, vertical: 14 * scale),
-        decoration: BoxDecoration(
-          color: colors.primaryLight,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: colors.primaryNormal.withValues(alpha: 0.25)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (coachingMessage != null) ...[
+            _buildCoachingBanner(context, colors, coachingMessage, scale),
+            SizedBox(height: 10 * scale),
+          ],
+          if (overload) ...[
+            _buildOverloadBanner(context, colors, scale),
+            SizedBox(height: 10 * scale),
+          ],
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 18 * scale, vertical: 14 * scale),
+            decoration: BoxDecoration(
+              color: accentLight,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: accentColor.withValues(alpha: 0.25)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: colors.primaryNormal,
-                    borderRadius: BorderRadius.circular(99),
-                  ),
-                  child: Text(
-                    '오늘의 학습',
-                    style: TextStyle(
-                      fontFamily: 'Pretendard',
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: colors.gray0,
-                      letterSpacing: -0.2,
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: accentColor,
+                        borderRadius: BorderRadius.circular(99),
+                      ),
+                      child: Text(
+                        isSprint ? '마무리 스프린트' : '오늘의 학습',
+                        style: TextStyle(
+                          fontFamily: 'Pretendard',
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: colors.gray0,
+                          letterSpacing: -0.2,
+                        ),
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        _todayTasksLabel(
+                          counts.conceptCount,
+                          counts.practiceCount,
+                          counts.reviewCount,
+                          counts.mockExamCount,
+                        ),
+                        style: Typo.bodyRegular(context, color: colors.gray900),
+                      ),
+                    ),
+                    Text(
+                      dateLabel,
+                      style: Typo.labelRegular(context, color: colors.gray500),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    _todayTasksLabel(counts.conceptCount, counts.practiceCount),
-                    style: Typo.bodyRegular(context, color: colors.gray900),
-                  ),
-                ),
-                Text(
-                  dateLabel,
-                  style: Typo.labelRegular(context, color: colors.gray500),
+                SizedBox(height: 10 * scale),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(99),
+                        child: LinearProgressIndicator(
+                          value: progress,
+                          minHeight: 6,
+                          backgroundColor: colors.gray70,
+                          valueColor: AlwaysStoppedAnimation(accentColor),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      planned > 0 ? '$completed / $planned · $percent%' : '$percent%',
+                      style: Typo.labelStrong(context, color: accentColor),
+                    ),
+                  ],
                 ),
               ],
             ),
-            SizedBox(height: 10 * scale),
-            Row(
-              children: [
-                Expanded(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(99),
-                    child: LinearProgressIndicator(
-                      value: progress,
-                      minHeight: 6,
-                      backgroundColor: colors.gray70,
-                      valueColor: AlwaysStoppedAnimation(colors.primaryNormal),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  '$percent%',
-                  style: Typo.labelStrong(context, color: colors.primaryNormal),
-                ),
-              ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Korean coaching message produced by the LLM (Qwen). Surfaced above
+  /// today's plan so the user understands *why* this plan looks the way it
+  /// does ("이번 주는 데이터베이스 비중을 늘렸어요 — 모의고사 정답률이 60%였거든요").
+  Widget _buildCoachingBanner(
+    BuildContext context,
+    ThemeColors colors,
+    String message,
+    double scale,
+  ) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 14 * scale, vertical: 12 * scale),
+      decoration: BoxDecoration(
+        color: colors.gray0,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: colors.gray70),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 1, right: 10),
+            child: Text(
+              '🧠',
+              style: TextStyle(fontSize: 16, fontFamily: 'TossFace'),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              message,
+              style: Typo.bodyRegular(context, color: colors.gray900),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOverloadBanner(
+    BuildContext context,
+    ThemeColors colors,
+    double scale,
+  ) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 14 * scale, vertical: 10 * scale),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF4E5),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFFFB266)),
+      ),
+      child: Row(
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(right: 8),
+            child: Text('⚠️', style: TextStyle(fontSize: 14)),
+          ),
+          Expanded(
+            child: Text(
+              '시험까지 시간이 빠듯해요. 학습 시간을 늘리거나 시험일을 조정해 보세요.',
+              style: Typo.labelRegular(context, color: const Color(0xFF8C5A00)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContentPlaceholder(
+    BuildContext context,
+    ThemeColors colors,
+    double scale,
+    double horizontalPadding,
+  ) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(horizontalPadding, 16 * scale, horizontalPadding, 0),
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 18 * scale, vertical: 18 * scale),
+        decoration: BoxDecoration(
+          color: colors.gray0,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: colors.gray70),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '콘텐츠 준비중이에요',
+              style: Typo.titleStrong(context, color: colors.gray900),
+            ),
+            SizedBox(height: 6 * scale),
+            Text(
+              '이 자격증의 학습 자료를 만들고 있어요. 준비가 끝나는 대로 알려드릴게요.',
+              style: Typo.bodyRegular(context, color: colors.gray500),
             ),
           ],
         ),
@@ -406,10 +541,12 @@ class _CurriculumPageState extends State<CurriculumPage> {
     );
   }
 
-  String _todayTasksLabel(int concept, int practice) {
+  String _todayTasksLabel(int concept, int practice, int review, int mockExam) {
     final parts = <String>[];
+    if (mockExam > 0) parts.add('모의고사 $mockExam회');
     if (concept > 0) parts.add('개념 $concept장');
     if (practice > 0) parts.add('문제 $practice개');
+    if (review > 0) parts.add('복습 $review개');
     return parts.join(' · ');
   }
 

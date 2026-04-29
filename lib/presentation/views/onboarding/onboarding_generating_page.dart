@@ -42,6 +42,8 @@ class _OnboardingGeneratingPageState extends State<OnboardingGeneratingPage> {
         if (_args['examSessionId'] != null)
           'examSessionId': _args['examSessionId'],
         if (_args['studyStyle'] != null) 'studyStyle': _args['studyStyle'],
+        if (_args['weekendMultiplier'] != null)
+          'weekendMultiplier': _args['weekendMultiplier'],
       };
       await _api.post('/curricula/generate', body: body);
       // Only mark the user as onboarded once the curriculum actually exists,

@@ -55,6 +55,23 @@ const _studyOptions = [
   ),
 ];
 
+// Weekend pacing presets — onboarding step 5. The number is sent as
+// `weekendMultiplier` to /curricula/generate. Backend keeps the *weekly*
+// total at hoursPerWeek and shifts mass between weekday/weekend by this
+// ratio, so picking 2× doesn't secretly inflate study time.
+class _WeekendOption {
+  final String label;
+  final String hint;
+  final double multiplier;
+  const _WeekendOption({required this.label, required this.hint, required this.multiplier});
+}
+
+const _weekendOptions = [
+  _WeekendOption(label: '평일과 같음', hint: '매일 균등하게', multiplier: 1.0),
+  _WeekendOption(label: '평일의 1.5배', hint: '주말에 조금 더 (기본)', multiplier: 1.5),
+  _WeekendOption(label: '평일의 2배', hint: '주말에 몰아서', multiplier: 2.0),
+];
+
 class OnboardingHoursPage extends StatefulWidget {
   const OnboardingHoursPage({super.key});
 
@@ -64,6 +81,9 @@ class OnboardingHoursPage extends StatefulWidget {
 
 class _OnboardingHoursPageState extends State<OnboardingHoursPage> {
   int? _selectedIndex;
+  // Default to "평일의 1.5배" — matches the backend default so picking nothing
+  // explicit yields the same plan as before this option existed.
+  int _weekendIndex = 1;
 
   Map<String, dynamic> get _prevArgs =>
       (Get.arguments as Map<String, dynamic>?) ?? {};
@@ -76,6 +96,8 @@ class _OnboardingHoursPageState extends State<OnboardingHoursPage> {
 
   int get _hoursPerWeek =>
       _selectedIndex != null ? _studyOptions[_selectedIndex!].hoursPerWeek : 7;
+
+  double get _weekendMultiplier => _weekendOptions[_weekendIndex].multiplier;
 
   @override
   Widget build(BuildContext context) {
@@ -141,6 +163,35 @@ class _OnboardingHoursPageState extends State<OnboardingHoursPage> {
                       ),
                     );
                   }),
+                  const SizedBox(height: 28),
+                  Text(
+                    '주말은 어떤가요?',
+                    style: TextStyle(
+                      fontFamily: 'SeoulAlrim',
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.4,
+                      color: colors.gray900,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '주중 학습 시간을 평일/주말에 나눠서 분배할게요.',
+                    style: Typo.labelRegular(context, color: colors.gray300),
+                  ),
+                  const SizedBox(height: 12),
+                  ...List.generate(_weekendOptions.length, (i) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: _WeekendChip(
+                        option: _weekendOptions[i],
+                        isSelected: _weekendIndex == i,
+                        colors: colors,
+                        onTap: () => setState(() => _weekendIndex = i),
+                        context: context,
+                      ),
+                    );
+                  }),
                   const SizedBox(height: 8),
                 ],
               ),
@@ -164,6 +215,7 @@ class _OnboardingHoursPageState extends State<OnboardingHoursPage> {
                           'examDate': _examDate,
                           'examSessionId': _examSessionId,
                           'hoursPerWeek': _hoursPerWeek,
+                          'weekendMultiplier': _weekendMultiplier,
                         },
                       ),
             ),
@@ -195,6 +247,93 @@ class _OnboardingHoursPageState extends State<OnboardingHoursPage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+// Weekend pacing chip (compact card variant)
+// ─────────────────────────────────────────────
+class _WeekendChip extends StatelessWidget {
+  final _WeekendOption option;
+  final bool isSelected;
+  final ThemeColors colors;
+  final VoidCallback onTap;
+  final BuildContext context;
+
+  const _WeekendChip({
+    required this.option,
+    required this.isSelected,
+    required this.colors,
+    required this.onTap,
+    required this.context,
+  });
+
+  @override
+  Widget build(BuildContext ctx) {
+    return Semantics(
+      button: true,
+      label: '${option.label} - ${option.hint}',
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: isSelected ? colors.primaryLight : colors.gray0,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected ? colors.primaryNormal : colors.gray30,
+              width: isSelected ? 1.5 : 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      option.label,
+                      style: TextStyle(
+                        fontFamily: 'Pretendard',
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.3,
+                        color: isSelected ? colors.primaryNormal : colors.gray900,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      option.hint,
+                      style: Typo.labelRegular(
+                        context,
+                        color: isSelected ? colors.primaryDark : colors.gray300,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: 18,
+                height: 18,
+                decoration: BoxDecoration(
+                  color: isSelected ? colors.primaryNormal : Colors.transparent,
+                  border: Border.all(
+                    color: isSelected ? colors.primaryNormal : colors.gray100,
+                    width: 1.5,
+                  ),
+                  shape: BoxShape.circle,
+                ),
+                child: isSelected
+                    ? Icon(Icons.check, size: 12, color: colors.gray0)
+                    : null,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
