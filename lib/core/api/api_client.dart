@@ -25,19 +25,24 @@ class ApiClient {
   final TokenStore _tokenStore = TokenStore();
 
   String get baseUrl {
+    // Debug builds (flutter run) prefer the local backend so dev workflow
+    // doesn't depend on the deploy pipeline. Order: API_BASE_URL_LOCAL env
+    // override → http://localhost:3000/api default. Release builds keep
+    // hitting API_BASE_URL (prod) and refuse to start without it.
+    if (kDebugMode) {
+      final localOverride = dotenv.maybeGet('API_BASE_URL_LOCAL');
+      final raw = (localOverride != null && localOverride.isNotEmpty)
+          ? localOverride
+          : 'http://localhost:3000/api';
+      if (kIsWeb) return raw;
+      if (Platform.isAndroid) return raw.replaceFirst('localhost', '10.0.2.2');
+      return raw;
+    }
     final configured = dotenv.maybeGet('API_BASE_URL');
-    // Release builds must have API_BASE_URL set in assets/config/.env. The
-    // localhost fallback only exists for local dev; shipping it would mean
-    // every request fails silently against a non-existent server.
-    if (!kDebugMode && (configured == null || configured.isEmpty)) {
+    if (configured == null || configured.isEmpty) {
       throw StateError('API_BASE_URL is missing from assets/config/.env');
     }
-    final raw = configured ?? 'http://localhost:3000/api';
-    if (kIsWeb) return raw;
-    if (Platform.isAndroid) {
-      return raw.replaceFirst('localhost', '10.0.2.2');
-    }
-    return raw;
+    return configured;
   }
 
   Future<Map<String, String>> _authHeaders() async {
