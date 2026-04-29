@@ -6,6 +6,7 @@ import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:kkeutgong_mobile/core/api/api_client.dart';
 import 'package:kkeutgong_mobile/core/routes/app_routes.dart';
+import 'package:kkeutgong_mobile/core/session/session.dart';
 import 'package:kkeutgong_mobile/data/repositories/auth/auth_repository.dart';
 import 'package:kkeutgong_mobile/data/repositories/stats/stats_repository.dart';
 import 'package:kkeutgong_mobile/gen/assets.gen.dart';
@@ -152,6 +153,23 @@ class _LoginPageState extends State<LoginPage> {
     try {
       final api = ApiClient();
       final result = await api.get('/users/me/certificates') as List;
+      // Pick the active cert (or the first one if none is flagged) so the
+      // home screen renders with the user's actual selection instead of the
+      // hardcoded '1' default.
+      if (result.isNotEmpty) {
+        Map<String, dynamic>? active;
+        for (final raw in result) {
+          if (raw is Map<String, dynamic> && raw['isActive'] == true) {
+            active = raw;
+            break;
+          }
+        }
+        active ??= result.first as Map<String, dynamic>;
+        final certId = active['certificateId'] as String?;
+        if (certId != null) {
+          await _setActiveCertificate(certId);
+        }
+      }
       return result.isNotEmpty;
     } catch (_) {
       // Onboarded users keep their session; fresh installs default to
@@ -161,15 +179,26 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  // Wires the just-picked cert into the in-memory Session and persists it so
+  // a cold relaunch can restore it before the home screen fires its first
+  // /home request.
+  Future<void> _setActiveCertificate(String certId) async {
+    Session().currentCertificateId = certId;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('active_certificate_id', certId);
+  }
+
   Future<void> _applyPendingOnboarding(
       SharedPreferences prefs, String certId) async {
     final api = ApiClient();
     try {
-      // Register certificate for this user first
+      // Register certificate for this user first. Backend marks the first
+      // registered cert as active automatically.
       await api.post('/users/me/certificates', body: {'certificateId': certId});
     } catch (_) {
       // Best-effort — proceed even if already registered
     }
+    await _setActiveCertificate(certId);
     try {
       final examDate = prefs.getString('pending_onboarding_examDate');
       final examSessionId = prefs.getString('pending_onboarding_examSessionId');

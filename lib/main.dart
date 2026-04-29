@@ -9,6 +9,7 @@ import 'package:kkeutgong_mobile/core/api/api_client.dart';
 import 'package:kkeutgong_mobile/core/auth/token_store.dart';
 import 'package:kkeutgong_mobile/core/notifications/notification_service.dart';
 import 'package:kkeutgong_mobile/core/routes/app_routes.dart';
+import 'package:kkeutgong_mobile/core/session/session.dart';
 import 'package:kkeutgong_mobile/core/version/version_gate.dart';
 import 'package:kkeutgong_mobile/presentation/views/system/force_update_page.dart';
 import 'package:kkeutgong_mobile/presentation/views/system/maintenance_page.dart';
@@ -103,6 +104,13 @@ class _MainAppState extends State<MainApp> {
     try {
       await ApiClient().get('/users/me');
       final hasOnboarded = prefs.getBool('has_onboarded') ?? false;
+      // Restore the active cert before the home screen mounts so its first
+      // /home request hits the user's actual cert instead of the hardcoded
+      // '1' default in Session.
+      final activeCert = prefs.getString('active_certificate_id');
+      if (activeCert != null && activeCert.isNotEmpty) {
+        Session().currentCertificateId = activeCert;
+      }
       setState(() {
         _bootState = _BootState.ready;
         _initialRoute = hasOnboarded ? AppRoutes.main : AppRoutes.onboarding;
