@@ -25,20 +25,18 @@ class ApiClient {
   final TokenStore _tokenStore = TokenStore();
 
   String get baseUrl {
-    // Debug builds opt into the local backend by setting
-    // API_BASE_URL_LOCAL in assets/config/.env (e.g. http://localhost:3000/api).
-    // Without that override we fall through to API_BASE_URL (prod) so a
-    // bare `flutter run` still works without spinning up a local server +
-    // local Postgres.
+    // Debug builds (flutter run) target the local backend so dev workflow
+    // doesn't need a deploy round-trip. Order: API_BASE_URL_LOCAL env
+    // override → http://localhost:3000/api default. Release builds keep
+    // hitting API_BASE_URL (prod) and refuse to start without it.
     if (kDebugMode) {
       final localOverride = dotenv.maybeGet('API_BASE_URL_LOCAL');
-      if (localOverride != null && localOverride.isNotEmpty) {
-        if (kIsWeb) return localOverride;
-        if (Platform.isAndroid) {
-          return localOverride.replaceFirst('localhost', '10.0.2.2');
-        }
-        return localOverride;
-      }
+      final raw = (localOverride != null && localOverride.isNotEmpty)
+          ? localOverride
+          : 'http://localhost:3000/api';
+      if (kIsWeb) return raw;
+      if (Platform.isAndroid) return raw.replaceFirst('localhost', '10.0.2.2');
+      return raw;
     }
     final configured = dotenv.maybeGet('API_BASE_URL');
     if (configured == null || configured.isEmpty) {
